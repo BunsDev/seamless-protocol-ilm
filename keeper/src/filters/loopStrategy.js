@@ -89,111 +89,129 @@ exports.handler = async function (payload) {
             let reasonSig = reason.signature;
             console.log('current match reason signature: ', reasonSig);
 
-            if (reasonSig == withdrawSig || reasonSig == depositSig) {
-                strategy = new ethers.Contract(
-                    ethers.utils.getAddress(reason.address),
-                    strategyABI,
-                    provider
-                );
-
-                let riskState = await isStrategyAtRisk(strategy, healthFactorThreshold);
-                let exposureState = await isStrategyOverexposed(strategy);
-                let EPSState = await hasEPSDecreased(store, strategy);
-
-                console.log('riskState: ', riskState);
-                console.log('exposureState: ', exposureState);
-                console.log('EPSState: ', EPSState);
-
-                let reasonType = reasonSig == withdrawSig ? 'withdraw' : 'deposit';
-
-                if (riskState.isAtRisk || exposureState.isOverExposed || EPSState.hasEPSDecreased) {
-                    matches.push({
-                        hash: evt.hash,
-                        metadata: {
-                            type: reasonType,
-                            riskState: riskState,
-                            exposureState: exposureState,
-                            EPSState: EPSState,
-                        },
-                    });
-                }
-            }
-
-            if (reasonSig == priceUpdateSig) {
-                let oracleAddress = ethers.utils.getAddress(reason.address);
-                let oracle = new ethers.Contract(oracleAddress, oracleABI, provider);
-
-                let latestAnswer = await oracle.latestAnswer();
-
-                for (let affectedStrategy of oracleToStrategies[oracleAddress]) {
-                    strategy = new ethers.Contract(affectedStrategy, strategyABI, provider);
-
-                    // update equityPerShare because price fluctuations may alter it organically
-                    updateEPS(store, affectedStrategy, await equityPerShare(strategy));
-
-                    if (await strategy.rebalanceNeeded()) {
-                        strategiesToRebalance.push(affectedStrategy);
-                    }
-                }
-
-                let oracleState = await isOracleOut(store, oracle);
-                let isSequencerOut = latestAnswer == 1;
-
-                if (strategiesToRebalance.length != 0 || oracleState.isOut || isSequencerOut) {
-                    matches.push({
-                        hash: evt.hash,
-                        metadata: {
-                            type: 'priceUpdate',
-                            strategiesToRebalance: strategiesToRebalance,
-                            oracleState: oracleState,
-                            isSequencerOut: isSequencerOut,
-                        },
-                    });
-                }
-            }
-
-            if (
-                reasonSig == poolBorrowSig ||
-                reasonSig == poolRepaySig ||
-                reasonSig == poolWithdrawSig ||
-                reasonSig == poolSupplySig ||
-                reasonSig == poolLiquidationSig
-            ) {
-                // on all events, reserve/collateral asset is first argument, which correlates to asset
-                // to query as this is the asset whose borrow rate is affected
-                let reserveAddress = reason.args[0];
-                console.log('reserveAddress: ', reserveAddress);
-
-                if (reserveAddress in debtTokenToStrategies) {
-                    let pool = new ethers.Contract(
+            try {
+                if (reasonSig == withdrawSig || reasonSig == depositSig) {
+                    strategy = new ethers.Contract(
                         ethers.utils.getAddress(reason.address),
-                        poolABI,
+                        strategyABI,
                         provider
                     );
 
-                    let reserveData = await pool.getReserveData(reserveAddress);
-                    let variableBorrowRate = reserveData[3];
+                    let riskState = await isStrategyAtRisk(strategy, healthFactorThreshold);
+                    let exposureState = await isStrategyOverexposed(strategy);
+                    let EPSState = await hasEPSDecreased(store, strategy);
 
-                    console.log('variableBorrowRate: ', variableBorrowRate);
+                    console.log('riskState: ', riskState);
+                    console.log('exposureState: ', exposureState);
+                    console.log('EPSState: ', EPSState);
 
-                    const affectedStrategies = debtTokenToStrategies[reserveAddress].filter(
-                        (strategy) => strategyInterestThreshold[strategy].lt(variableBorrowRate)
-                    );
+                    let reasonType = reasonSig == withdrawSig ? 'withdraw' : 'deposit';
 
-                    console.log('affectedStrategies: ', affectedStrategies);
-
-                    if (affectedStrategies.length != 0) {
+                    if (
+                        riskState.isAtRisk ||
+                        exposureState.isOverExposed ||
+                        EPSState.hasEPSDecreased
+                    ) {
                         matches.push({
                             hash: evt.hash,
                             metadata: {
-                                type: 'borrowRate',
-                                reserve: reserveAddress,
-                                currBorrowRate: variableBorrowRate,
-                                affectedStrategies: affectedStrategies,
+                                type: reasonType,
+                                riskState: riskState,
+                                exposureState: exposureState,
+                                EPSState: EPSState,
                             },
                         });
                     }
                 }
+            } catch (err) {
+                console.error('There was an error during withdraw or deposit check flow.');
+                throw err;
+            }
+
+            try {
+                if (reasonSig == priceUpdateSig) {
+                    let oracleAddress = ethers.utils.getAddress(reason.address);
+                    let oracle = new ethers.Contract(oracleAddress, oracleABI, provider);
+
+                    let latestAnswer = await oracle.latestAnswer();
+
+                    for (let affectedStrategy of oracleToStrategies[oracleAddress]) {
+                        strategy = new ethers.Contract(affectedStrategy, strategyABI, provider);
+
+                        // update equityPerShare because price fluctuations may alter it organically
+                        updateEPS(store, affectedStrategy, await equityPerShare(strategy));
+
+                        if (await strategy.rebalanceNeeded()) {
+                            strategiesToRebalance.push(affectedStrategy);
+                        }
+                    }
+
+                    let oracleState = await isOracleOut(store, oracle);
+                    let isSequencerOut = latestAnswer == 1;
+
+                    if (strategiesToRebalance.length != 0 || oracleState.isOut || isSequencerOut) {
+                        matches.push({
+                            hash: evt.hash,
+                            metadata: {
+                                type: 'priceUpdate',
+                                strategiesToRebalance: strategiesToRebalance,
+                                oracleState: oracleState,
+                                isSequencerOut: isSequencerOut,
+                            },
+                        });
+                    }
+                }
+            } catch (err) {
+                console.log('There was an error during priceUpdate check flow.');
+                throw err;
+            }
+
+            try {
+                if (
+                    reasonSig == poolBorrowSig ||
+                    reasonSig == poolRepaySig ||
+                    reasonSig == poolWithdrawSig ||
+                    reasonSig == poolSupplySig ||
+                    reasonSig == poolLiquidationSig
+                ) {
+                    // on all events, reserve/collateral asset is first argument, which correlates to asset
+                    // to query as this is the asset whose borrow rate is affected
+                    let reserveAddress = reason.args[0];
+                    console.log('reserveAddress: ', reserveAddress);
+
+                    if (reserveAddress in debtTokenToStrategies) {
+                        let pool = new ethers.Contract(
+                            ethers.utils.getAddress(reason.address),
+                            poolABI,
+                            provider
+                        );
+
+                        let reserveData = await pool.getReserveData(reserveAddress);
+                        let variableBorrowRate = reserveData[3];
+
+                        const affectedStrategies = debtTokenToStrategies[reserveAddress].filter(
+                            (strategy) => strategyInterestThreshold[strategy].lt(variableBorrowRate)
+                        );
+
+                        console.log('variableBorrowRate: ', variableBorrowRate);
+                        console.log('affectedStrategies: ', affectedStrategies);
+
+                        if (affectedStrategies.length != 0) {
+                            matches.push({
+                                hash: evt.hash,
+                                metadata: {
+                                    type: 'borrowRate',
+                                    reserve: reserveAddress,
+                                    currBorrowRate: variableBorrowRate,
+                                    affectedStrategies: affectedStrategies,
+                                },
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('There was an error during pool action check flow.');
+                throw err;
             }
         }
     }
