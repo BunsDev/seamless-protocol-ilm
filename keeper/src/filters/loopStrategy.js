@@ -72,17 +72,122 @@ const RPC_URL = 'some_rpc_url';
 
 const healthFactorThreshold = ethers.BigNumber.from(ethers.utils.parseUnits('1.1', 8)); //value used for testing
 
+function createMatch(hash, type, metadata) {
+    return {
+        hash,
+        metadata: {
+            type,
+            ...metadata,
+        },
+    };
+}
+
+async function handleWithdrawOrDeposit(
+    reasonType,
+    reason,
+    evtHash,
+    matches,
+    provider,
+    store,
+    strategyABI
+) {
+    const strategy = new ethers.Contract(
+        ethers.utils.getAddress(reason.address),
+        strategyABI,
+        provider
+    );
+    const [riskState, exposureState, EPSState] = await Promise.all([
+        isStrategyAtRisk(strategy, healthFactorThreshold),
+        isStrategyOverexposed(strategy),
+        hasEPSDecreased(store, strategy),
+    ]);
+
+    console.log('riskState: ', riskState);
+    console.log('exposureState: ', exposureState);
+    console.log('EPSState: ', EPSState);
+
+    if (riskState.isAtRisk) {
+        matches.push(createMatch(evtHash, reasonType, { riskState }));
+    }
+    if (exposureState.isOverExposed) {
+        matches.push(createMatch(evtHash, reasonType, { exposureState }));
+    }
+    if (EPSState.hasEPSDecreased) {
+        matches.push(createMatch(evtHash, reasonType, { EPSState }));
+    }
+}
+
+async function handlePriceUpdate(reason, evtHash, matches, provider, store, strategyABI) {
+    const oracleAddress = ethers.utils.getAddress(reason.address);
+    const oracle = new ethers.Contract(oracleAddress, oracleABI, provider);
+    const latestAnswer = await oracle.latestAnswer();
+    const strategiesToRebalance = [];
+
+    for (let affectedStrategy of oracleToStrategies[oracleAddress] || []) {
+        const strategy = new ethers.Contract(affectedStrategy, strategyABI, provider);
+
+        // update equityPerShare because price fluctuations may alter it organically
+        await updateEPS(store, affectedStrategy, await equityPerShare(strategy));
+
+        if (await strategy.rebalanceNeeded()) {
+            strategiesToRebalance.push(affectedStrategy);
+        }
+    }
+
+    const [oracleState, isSequencerOut] = await Promise.all([
+        isOracleOut(store, oracle),
+        latestAnswer === 1,
+    ]);
+
+    if (strategiesToRebalance.length > 0 || oracleState.isOut || isSequencerOut) {
+        matches.push(
+            createMatch(evtHash, 'priceUpdate', {
+                strategiesToRebalance,
+                oracleState,
+                isSequencerOut,
+            })
+        );
+    }
+}
+
+async function handlePoolAction(reason, evtHash, matches, provider, poolABI) {
+    const reserveAddress = ethers.utils.getAddress(reason.args[0]);
+    console.log('reserveAddress: ', reserveAddress);
+
+    if (reserveAddress in debtTokenToStrategies) {
+        const pool = new ethers.Contract(
+            ethers.utils.getAddress(reason.address),
+            poolABI,
+            provider
+        );
+        const reserveData = await pool.getReserveData(reserveAddress);
+        const variableBorrowRate = reserveData[3];
+
+        const affectedStrategies = debtTokenToStrategies[reserveAddress].filter((strategy) =>
+            strategyInterestThreshold[strategy].lt(variableBorrowRate)
+        );
+
+        console.log('variableBorrowRate: ', variableBorrowRate);
+        console.log('affectedStrategies: ', affectedStrategies);
+
+        if (affectedStrategies.length > 0) {
+            matches.push(
+                createMatch(evtHash, 'borrowRate', {
+                    reserve: reserveAddress,
+                    currBorrowRate: variableBorrowRate,
+                    affectedStrategies,
+                })
+            );
+        }
+    }
+}
+
 exports.handler = async function (payload) {
     const conditionRequest = payload.request.body;
     const matches = [];
     const events = conditionRequest.events;
-
     const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-
     const store = new KeyValueStoreClient(payload);
-
-    let strategy;
-    let strategiesToRebalance = [];
 
     for (let evt of events) {
         for (let reason of evt.matchReasons) {
@@ -90,55 +195,21 @@ exports.handler = async function (payload) {
             console.log('current match reason signature: ', reasonSig);
 
             try {
-                if (reasonSig == withdrawSig || reasonSig == depositSig) {
-                    strategy = new ethers.Contract(
-                        ethers.utils.getAddress(reason.address),
-                        strategyABI,
-                        provider
+                if ([withdrawSig, depositSig].includes(reasonSig)) {
+                    const reasonType = reasonSig === withdrawSig ? 'withdraw' : 'deposit';
+
+                    await handleWithdrawOrDeposit(
+                        reasonType,
+                        reason,
+                        evt.hash,
+                        matches,
+                        provider,
+                        store,
+                        strategyABI
                     );
-
-                    let riskState = await isStrategyAtRisk(strategy, healthFactorThreshold);
-                    let exposureState = await isStrategyOverexposed(strategy);
-                    let EPSState = await hasEPSDecreased(store, strategy);
-
-                    console.log('riskState: ', riskState);
-                    console.log('exposureState: ', exposureState);
-                    console.log('EPSState: ', EPSState);
-
-                    let reasonType = reasonSig == withdrawSig ? 'withdraw' : 'deposit';
-
-                    if (riskState.isAtRisk) {
-                        matches.push({
-                            hash: evt.hash,
-                            metadata: {
-                                type: reasonType,
-                                riskState: riskState,
-                            },
-                        });
-                    }
-
-                    if (exposureState.isOverExposed) {
-                        matches.push({
-                            hash: evt.hash,
-                            metadata: {
-                                type: reasonType,
-                                exposureState: exposureState,
-                            },
-                        });
-                    }
-
-                    if (EPSState.hasEPSDecreased) {
-                        matches.push({
-                            hash: evt.hash,
-                            metadata: {
-                                type: reasonType,
-                                EPSState: EPSState,
-                            },
-                        });
-                    }
-
-                    console.log('matches: ', matches);
                 }
+
+                console.log('matches: ', matches);
             } catch (err) {
                 console.error('There was an error during withdraw or deposit check flow.');
                 throw err;
@@ -146,37 +217,17 @@ exports.handler = async function (payload) {
 
             try {
                 if (reasonSig == priceUpdateSig) {
-                    let oracleAddress = ethers.utils.getAddress(reason.address);
-                    let oracle = new ethers.Contract(oracleAddress, oracleABI, provider);
-
-                    let latestAnswer = await oracle.latestAnswer();
-
-                    for (let affectedStrategy of oracleToStrategies[oracleAddress]) {
-                        strategy = new ethers.Contract(affectedStrategy, strategyABI, provider);
-
-                        // update equityPerShare because price fluctuations may alter it organically
-                        updateEPS(store, affectedStrategy, await equityPerShare(strategy));
-
-                        if (await strategy.rebalanceNeeded()) {
-                            strategiesToRebalance.push(affectedStrategy);
-                        }
-                    }
-
-                    let oracleState = await isOracleOut(store, oracle);
-                    let isSequencerOut = latestAnswer == 1;
-
-                    if (strategiesToRebalance.length != 0 || oracleState.isOut || isSequencerOut) {
-                        matches.push({
-                            hash: evt.hash,
-                            metadata: {
-                                type: 'priceUpdate',
-                                strategiesToRebalance: strategiesToRebalance,
-                                oracleState: oracleState,
-                                isSequencerOut: isSequencerOut,
-                            },
-                        });
-                    }
+                    await handlePriceUpdate(
+                        reason,
+                        evt.hash,
+                        matches,
+                        provider,
+                        store,
+                        strategyABI
+                    );
                 }
+
+                console.log('matches: ', matches);
             } catch (err) {
                 console.log('There was an error during priceUpdate check flow.');
                 throw err;
@@ -184,46 +235,15 @@ exports.handler = async function (payload) {
 
             try {
                 if (
-                    reasonSig == poolBorrowSig ||
-                    reasonSig == poolRepaySig ||
-                    reasonSig == poolWithdrawSig ||
-                    reasonSig == poolSupplySig ||
-                    reasonSig == poolLiquidationSig
+                    [
+                        poolBorrowSig,
+                        poolRepaySig,
+                        poolWithdrawSig,
+                        poolSupplySig,
+                        poolLiquidationSig,
+                    ].includes(reasonSig)
                 ) {
-                    // on all events, reserve/collateral asset is first argument, which correlates to asset
-                    // to query as this is the asset whose borrow rate is affected
-                    let reserveAddress = reason.args[0];
-                    console.log('reserveAddress: ', reserveAddress);
-
-                    if (reserveAddress in debtTokenToStrategies) {
-                        let pool = new ethers.Contract(
-                            ethers.utils.getAddress(reason.address),
-                            poolABI,
-                            provider
-                        );
-
-                        let reserveData = await pool.getReserveData(reserveAddress);
-                        let variableBorrowRate = reserveData[3];
-
-                        const affectedStrategies = debtTokenToStrategies[reserveAddress].filter(
-                            (strategy) => strategyInterestThreshold[strategy].lt(variableBorrowRate)
-                        );
-
-                        console.log('variableBorrowRate: ', variableBorrowRate);
-                        console.log('affectedStrategies: ', affectedStrategies);
-
-                        if (affectedStrategies.length != 0) {
-                            matches.push({
-                                hash: evt.hash,
-                                metadata: {
-                                    type: 'borrowRate',
-                                    reserve: reserveAddress,
-                                    currBorrowRate: variableBorrowRate,
-                                    affectedStrategies: affectedStrategies,
-                                },
-                            });
-                        }
-                    }
+                    await handlePoolAction(reason, evt.hash, matches, provider, poolABI);
                 }
             } catch (err) {
                 console.log('There was an error during pool action check flow.');
