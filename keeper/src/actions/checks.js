@@ -82,7 +82,9 @@ async function hasEPSDecreased(store, strategy) {
 
         return {
             strategyAddress: strategy.address,
-            hasEPSDecreased: ethers.BigNumber.from(prevEPS.toString()).gt(ethers.BigNumber.from(currentEPS.toString())),
+            hasEPSDecreased: ethers.BigNumber.from(prevEPS.toString()).gt(
+                ethers.BigNumber.from(currentEPS.toString())
+            ),
             prevEPS: prevEPS,
             currentEPS: currentEPS,
         };

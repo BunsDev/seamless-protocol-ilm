@@ -97,7 +97,7 @@ exports.handler = async function (payload, context) {
                     metadata.EPSState.strategyAddress,
                     metadata.EPSState.currentEPS,
                     metadata.EPSState.prevEPS,
-                    actionType
+                    actionType,
                 ],
                 `No EPS alert was sent as previous EPS was ${metadata.EPSState.prevEPS} and current EPS is ${metadata.EPSState.currentEPS}`
             );
