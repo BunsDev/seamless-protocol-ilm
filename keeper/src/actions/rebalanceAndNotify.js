@@ -125,58 +125,55 @@ exports.handler = async function (payload, context) {
                         let riskState = await isStrategyAtRisk(strategy, healthFactorThreshold);
                         let exposureState = await isStrategyOverexposed(strategy);
 
-                        if (riskState.isAtRisk) {
-                            await sendHealthFactorAlert(
-                                notificationClient,
-                                riskState.threshold,
-                                riskState.healthFactor
-                            );
-                            console.log('Sent health factor alert.');
-                        } else {
-                            console.log(
-                                `Health factor is deemed to be safe at: ${riskState.healthFactor}.`
-                            );
-                        }
+                        await handleStateAlert(
+                            riskState,
+                            'isAtRisk',
+                            sendHealthFactorAlert,
+                            [notificationClient, riskState.threshold, riskState.healthFactor],
+                            `Health factor is deemed to be safe at: ${riskState.healthFactor}.`
+                        );
 
-                        if (exposureState.isOverExposed) {
-                            await sendExposureAlert(
-                                notificationClient,
-                                exposureState.current,
-                                exposureState.min
-                            );
-                            console.log('Sent exposure alert.');
-                        } else {
-                            console.log(
-                                `Exposure is deemed to be fine at ${exposureState.current}.`
-                            );
-                        }
+                        await handleStateAlert(
+                            exposureState,
+                            'isOverExposed',
+                            sendExposureAlert,
+                            [notificationClient, exposureState.current, exposureState.min],
+                            `Exposure is deemed to be fine at ${exposureState.current}.`
+                        );
                     }
                 );
 
                 await Promise.all(rebalancePromises);
             } catch (err) {
                 console.log('There was an error when attempting to rebalance affected strategies.');
+                throw err;
             }
         } else {
             console.log('No strategies needing rebalance have been detected.');
         }
 
-        if (metadata.oracleState !== undefined && metadata.oracleState.isOut) {
-            await sendOracleOutageAlert(
-                notificationClient,
-                metadata.oracleState.oracleAddress,
-                metadata.oracleState.secondsSinceLastUpdate
+        if (metadata.oracleState) {
+            await handleStateAlert(
+                metadata.oracleState,
+                'isOut',
+                sendOracleOutageAlert,
+                [
+                    notificationClient,
+                    metadata.oracleState.oracleAddress,
+                    metadata.oracleState.secondsSinceLastUpdate,
+                ],
+                'Oracle outage alert has not been sent.'
             );
-            console.log('Sent oracle outage alert.');
-        } else {
-            console.log('Oracle outage alert has not been sent.');
         }
 
-        if (metadata.isSequencerOut !== undefined && metadata.isSequencerOut) {
-            await sendSequencerOutageAlert(notificationClient);
-            console.log('Sent sequencer outage alert.');
-        } else {
-            console.log('Sequencer outage alert has not been sent.');
+        if (metadata.isSequencerOut) {
+            await handleStateAlert(
+                metadata,
+                'isSequencerOut',
+                sendSequencerOutageAlert,
+                [notificationClient],
+                'Sequencer outage alert has not been sent.'
+            );
         }
     }
 
