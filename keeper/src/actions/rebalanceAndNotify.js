@@ -51,39 +51,45 @@ exports.handler = async function (payload, context) {
 
     const metadata = payload.request.body.metadata;
 
-    if ('type' in metadata && metadata.type == 'withdrawOrDeposit') {
+    if ('type' in metadata && (metadata.type == 'withdraw' || metadata.type == 'deposit')) {
         console.log('Processing states after withdrawal or deposit...');
         console.log('Metadata to check against: ', metadata);
 
         if (metadata.riskState !== undefined && metadata.riskState.isAtRisk) {
             await sendHealthFactorAlert(
                 notificationClient,
-                riskState.threshold,
-                riskState.healthFactor
+                metadata.riskState.threshold,
+                metadata.riskState.healthFactor
             );
             console.log('Sent health factor alert.');
         } else {
-            console.log(`Health factor is deemed to be safe at: ${riskState.healthFactor}.`);
+            console.log(
+                `Health factor is deemed to be safe at: ${metadata.riskState.healthFactor}.`
+            );
         }
 
         if (metadata.exposureState !== undefined && metadata.exposureState.isOverExposed) {
-            await sendExposureAlert(notificationClient, exposureState.current, exposureState.min);
+            await sendExposureAlert(
+                notificationClient,
+                metadata.exposureState.current,
+                metadata.exposureState.min
+            );
             console.log('Sent exposure alert.');
         } else {
-            console.log(`Exposure is deemed to be fine at ${exposureState.current}.`);
+            console.log(`Exposure is deemed to be fine at ${metadata.exposureState.current}.`);
         }
 
         if (metadata.EPSState !== undefined && metadata.EPSState.hasEPSDecreased) {
             await sendEPSAlert(
                 notificationClient,
-                EPSState.strategyAddress,
-                EPSState.currentEPS,
-                EPSState.currentEPS
+                metadata.EPSState.strategyAddress,
+                metadata.EPSState.currentEPS,
+                metadata.EPSState.currentEPS
             );
             console.log('EPS alert has been sent out.');
         } else {
             console.log(
-                `No EPS alert was sent as previous EPS was ${EPSState.prevEPS} and current EPS is ${EPSState.currentEPS}`
+                `No EPS alert was sent as previous EPS was ${metadata.EPSState.prevEPS} and current EPS is ${metadata.EPSState.currentEPS}`
             );
         }
 
