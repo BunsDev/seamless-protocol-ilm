@@ -1,4 +1,3 @@
-
 /// This file contains only helpers to send notifications via the OZ Defender notification client.
 /// No checking logic is contained herein.
 
@@ -71,8 +70,7 @@ async function sendBorrowRateAlert(notificationClient, reserve, currentRate, aff
         });
     } catch (error) {
         console.error('Failed to send notification', error);
-    }   
-    
+    }
 }
 
 exports.sendOracleOutageAlert = sendOracleOutageAlert;

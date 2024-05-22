@@ -1,4 +1,4 @@
-const { ethers } = require("ethers");
+const { ethers } = require('ethers');
 
 // get current equity per share
 async function equityPerShare(strategy) {
@@ -7,7 +7,6 @@ async function equityPerShare(strategy) {
         const sharesBN = ethers.BigNumber.from((await strategy.totalSupply()).toString());
 
         return equityBN.div(sharesBN);
-
     } catch (err) {
         console.error('An error has occured during equityPerShare calculation: ', err);
     }
@@ -21,5 +20,3 @@ async function updateEPS(store, strategy, currentEPS) {
 
 exports.equityPerShare = equityPerShare;
 exports.updateEPS = updateEPS;
-
-
