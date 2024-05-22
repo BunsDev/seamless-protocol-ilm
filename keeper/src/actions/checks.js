@@ -42,7 +42,7 @@ async function isStrategyOverexposed(strategy) {
             min: minForRebalance,
         };
     } catch (err) {
-        console.error('An error has occured during collateral ratio check: ', err);
+        console.error('An error has occurred during collateral ratio check: ', err);
         throw err;
     }
 }

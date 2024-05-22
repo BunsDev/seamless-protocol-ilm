@@ -1,10 +1,11 @@
+const { ethers } = require('ethers');
 const { expect } = require('chai');
 const sinon = require('sinon');
 const {
     isStrategyOverexposed,
     isStrategyAtRisk,
     checkAlertChannelsExist,
-} = require('../actions/utils');
+} = require('../src/actions/checks');
 
 describe('utils', () => {
     let strategyStub;
@@ -13,8 +14,8 @@ describe('utils', () => {
         strategyStub = {
             currentCollateralRatio: sinon.stub(),
             getCollateralRatioTargets: sinon.stub(),
-            debt: sinon.stub(),
-            collateral: sinon.stub(),
+            debtUSD: sinon.stub(),
+            collateralUSD: sinon.stub(),
         };
     });
 
@@ -30,8 +31,8 @@ describe('utils', () => {
             const result = await isStrategyOverexposed(strategyStub);
 
             expect(result.isOverExposed).to.eq(false);
-            expect(result.current).to.eq(100);
-            expect(result.min).to.eq(90);
+            expect(result.current).to.deep.eq(ethers.BigNumber.from(String(100).toString()));
+            expect(result.min).to.deep.eq(ethers.BigNumber.from(String(90).toString()));
         });
 
         it('returns true, and, currentCollateralRatio and minForRebalance values when currentCollateralRatio value is beneath minForRebalance value', async () => {
@@ -41,8 +42,8 @@ describe('utils', () => {
             const result = await isStrategyOverexposed(strategyStub);
 
             expect(result.isOverExposed).to.eq(true);
-            expect(result.current).to.eq(85);
-            expect(result.min).to.eq(90);
+            expect(result.current).to.deep.eq(ethers.BigNumber.from(String(85).toString()));
+            expect(result.min).to.deep.eq(ethers.BigNumber.from(String(90).toString()));
         });
 
         it('should handle errors', async () => {
@@ -57,6 +58,27 @@ describe('utils', () => {
             );
 
             console.error.restore();
+        });
+
+        it('should log an error and rethrow it when isStrategyOverexposed fails', async function () {
+            const consoleErrorSpy = sinon.spy(console, 'error');
+            const error = new Error('Test error');
+            strategyStub.currentCollateralRatio.resolves(ethers.BigNumber.from('1000'));
+            strategyStub.getCollateralRatioTargets.rejects(error);
+
+            try {
+                await isStrategyOverexposed(strategyStub);
+            } catch (err) {
+                expect(err).to.equal(error);
+            }
+            
+            const actualCall = consoleErrorSpy.getCall(0);
+            const expectedMessage = 'An error has occurred during collateral ratio check: ';
+
+            expect(actualCall.args[0]).to.include(expectedMessage);
+            expect(actualCall.args[1]).to.equal(error);
+
+            consoleErrorSpy.restore();
         });
     });
 

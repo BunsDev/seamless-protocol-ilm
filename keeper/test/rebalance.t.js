@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
-const { performRebalance } = require('../actions/rebalance');
+const { performRebalance } = require('../src/actions/rebalanceAndNotify');
 
 describe('performRebalance', () => {
     let strategyStub;
