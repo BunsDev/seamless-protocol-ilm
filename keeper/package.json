@@ -17,6 +17,7 @@
     "@babel/preset-env": "^7.24.5",
     "@openzeppelin/defender-sdk": "1.1.0",
     "chai": "^4.2.0",
+    "defender-kvstore-client": "^1.44.4",
     "ethers": "5.5.3",
     "mocha": "^10.2.0",
     "prettier": "^3.2.5",
