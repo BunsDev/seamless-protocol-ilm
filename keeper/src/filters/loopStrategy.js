@@ -107,21 +107,37 @@ exports.handler = async function (payload) {
 
                     let reasonType = reasonSig == withdrawSig ? 'withdraw' : 'deposit';
 
-                    if (
-                        riskState.isAtRisk ||
-                        exposureState.isOverExposed ||
-                        EPSState.hasEPSDecreased
-                    ) {
+                    if (riskState.isAtRisk) {
                         matches.push({
                             hash: evt.hash,
                             metadata: {
                                 type: reasonType,
                                 riskState: riskState,
+                            },
+                        });
+                    }
+
+                    if (exposureState.isOverExposed) {
+                        matches.push({
+                            hash: evt.hash,
+                            metadata: {
+                                type: reasonType,
                                 exposureState: exposureState,
+                            },
+                        });
+                    }
+
+                    if (EPSState.hasEPSDecreased) {
+                        matches.push({
+                            hash: evt.hash,
+                            metadata: {
+                                type: reasonType,
                                 EPSState: EPSState,
                             },
                         });
                     }
+
+                    console.log('matches: ', matches);
                 }
             } catch (err) {
                 console.error('There was an error during withdraw or deposit check flow.');
