@@ -42,11 +42,11 @@ async function sendHealthFactorAlert(notificationClient, healthFactorThreshold, 
 
 async function sendEPSAlert(notificationClient, strategyAddress, currentEPS, prevEPS, actionType) {
     console.log('currEPS: ', currentEPS);
-  	console.log('prevEPS: ', prevEPS);
-  	let currentEPSNum = ethers.BigNumber.from(currentEPS).toString();
-  	let prevEPSNum = ethers.BigNumber.from(prevEPS.toString()).toString();
-  	console.log('currEPSNum: ', currentEPSNum);
-  	console.log('prevEPSNum: ', prevEPSNum);
+    console.log('prevEPS: ', prevEPS);
+    let currentEPSNum = ethers.BigNumber.from(currentEPS).toString();
+    let prevEPSNum = ethers.BigNumber.from(prevEPS.toString()).toString();
+    console.log('currEPSNum: ', currentEPSNum);
+    console.log('prevEPSNum: ', prevEPSNum);
     try {
         notificationClient.send({
             channelAlias: 'seamless-alerts',
