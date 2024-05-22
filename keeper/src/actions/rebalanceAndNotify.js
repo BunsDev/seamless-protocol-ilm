@@ -1,5 +1,6 @@
 const { ethers } = require('ethers');
 const { Defender } = require('@openzeppelin/defender-sdk');
+const { KeyValueStoreClient } = require('defender-kvstore-client');
 const { equityPerShare, updateEPS } = require('./utils');
 const {
     sendHealthFactorAlert,
@@ -85,6 +86,8 @@ exports.handler = async function (payload, context) {
         }
 
         if (metadata.EPSState) {
+            const actionType = metadata.type == 'withdraw' ? 'withdraw' : 'deposit';
+
             await handleStateAlert(
                 metadata.EPSState,
                 'hasEPSDecreased',
@@ -94,6 +97,7 @@ exports.handler = async function (payload, context) {
                     metadata.EPSState.strategyAddress,
                     metadata.EPSState.currentEPS,
                     metadata.EPSState.prevEPS,
+                    actionType
                 ],
                 `No EPS alert was sent as previous EPS was ${metadata.EPSState.prevEPS} and current EPS is ${metadata.EPSState.currentEPS}`
             );

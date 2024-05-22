@@ -37,12 +37,12 @@ async function sendHealthFactorAlert(notificationClient, healthFactorThreshold, 
     }
 }
 
-async function sendEPSAlert(notificationClient, strategyAddress, currentEPS, prevEPS) {
+async function sendEPSAlert(notificationClient, strategyAddress, currentEPS, prevEPS, actionType) {
     try {
         notificationClient.send({
             channelAlias: 'seamless-alerts',
-            subject: 'STRATEGY EQUITY_PER_SHARE DECREASED FROM WITHDRAWAL',
-            message: `For strategy: ${strategyAddress}, EPS is ${currentEPS} and previous EPS was ${prevEPS} `,
+            subject: `STRATEGY EQUITY PER SHARE DECREASED AFTER USER ACTION: ${String(actionType).toUpperCase()} `,
+            message: `This action resulted in ${strategyAddress} EPS to become ${currentEPS} from ${prevEPS} `,
         });
     } catch (error) {
         console.error('Failed to send notification', error);
