@@ -712,7 +712,7 @@ contract LoopStrategy is
             );
         }
 
-        if (to != address(0)) {
+        if (to != address(0) && to != from) {
             IRewardsController(REWARDS_CONTROLLER).handleAction(
                 to, totalSupply(), balanceOf(to)
             );
