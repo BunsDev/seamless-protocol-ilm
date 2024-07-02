@@ -67,23 +67,9 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         vm.stopPrank();
 
         vm.allowCheatcodes(address(rewardsHandler));
-        rewardsHandler.createUsers();
 
         // This is necessary so all deployed contracts in setUp are removed from the target contracts list
         targetContract(address(rewardsHandler));
-
-        bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = rewardsHandler.deposit.selector;
-        selectors[1] = rewardsHandler.withdraw.selector;
-        selectors[2] = rewardsHandler.transfer.selector;
-        selectors[3] = rewardsHandler.claimAllRewards.selector;
-
-        FuzzSelector memory selector = FuzzSelector({
-            addr: address(rewardsHandler),
-            selectors: selectors
-        });
-
-        targetSelector(selector);
     }
 
     function test_Deposit_OneUser() public {

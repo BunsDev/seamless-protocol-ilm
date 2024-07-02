@@ -53,12 +53,10 @@ contract RewardsHandler is Test, TestConstants {
 
         StrategyAssets memory strategyAssets = strategy.getAssets();
         strategyUnderlying = strategyAssets.underlying;
-    }
 
-    function createUsers() public {
-        actors.push(makeAddr("alice"));
-        actors.push(makeAddr("bob"));
-        actors.push(makeAddr("charley"));
+        actors.push(address(1));
+        actors.push(address(2));
+        actors.push(address(3));
     }
 
     function getActors() public view returns (address[] memory) {
