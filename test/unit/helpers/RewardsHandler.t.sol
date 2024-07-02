@@ -81,7 +81,7 @@ contract RewardsHandler is Test, TestConstants {
         supplyToken.approve(address(pool), shares);
         pool.deposit(address(supplyToken), shares, user, 0);
 
-        vm.warp(block.timestamp + timeToPass);
+        skip(timeToPass);
     }
 
     function withdraw(uint256 actorIndex, uint256 amount, uint8 timeToPass)
@@ -101,7 +101,7 @@ contract RewardsHandler is Test, TestConstants {
         strategy.redeem(amount, user, user);
         pool.withdraw(address(supplyToken), amount, user);
 
-        vm.warp(block.timestamp + timeToPass);
+        skip(timeToPass);
     }
 
     function transfer(
@@ -125,7 +125,7 @@ contract RewardsHandler is Test, TestConstants {
         strategy.transfer(toUser, amount);
         IERC20(sSupplyTokenAddress).transfer(toUser, amount);
 
-        vm.warp(block.timestamp + timeToPass);
+        skip(timeToPass);
     }
 
     function claimAllRewards(
@@ -166,6 +166,6 @@ contract RewardsHandler is Test, TestConstants {
             );
         }
 
-        vm.warp(block.timestamp + timeToPass);
+        skip(timeToPass);
     }
 }
