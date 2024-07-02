@@ -41,11 +41,13 @@ import { UUPSUpgradeable } from
     "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IRewardsController } from
     "@aave-periphery/contracts/rewards/interfaces/IRewardsController.sol";
+import { IScaledToken } from "./interfaces/IScaledToken.sol";
 
 /// @title LoopStrategy
 /// @notice Integrated Liquidity Market strategy for amplifying the cbETH staking rewards
 contract LoopStrategy is
     ILoopStrategy,
+    IScaledToken,
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
@@ -511,12 +513,12 @@ contract LoopStrategy is
         return Storage.layout().maxSlippageOnRebalance;
     }
 
-    /// @inheritdoc ILoopStrategy
+    /// @inheritdoc IScaledToken
     function scaledTotalSupply() external view returns (uint256) {
         return totalSupply();
     }
 
-    /// @inheritdoc ILoopStrategy
+    /// @inheritdoc IScaledToken
     function getScaledUserBalanceAndSupply(address user)
         external
         view
