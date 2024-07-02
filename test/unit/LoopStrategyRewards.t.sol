@@ -24,12 +24,13 @@ import { IPool } from "@aave/contracts/interfaces/IPool.sol";
 import { DataTypes } from
     "@aave/contracts/protocol/libraries/types/DataTypes.sol";
 import { RewardsHandler } from "./helpers/RewardsHandler.t.sol";
+import { MockEACAggregatorProxy } from "../mock/MockEACAggregatorProxy.sol";
 import "forge-std/console.sol";
 
 contract LoopStrategyDepositTest is LoopStrategyTest {
     ERC20Mock public supplyToken = new ERC20Mock();
     ERC20Mock public rewardToken = new ERC20Mock();
-    MockAaveOracle public oracle;
+    MockEACAggregatorProxy public aggregatorProxy;
     MockTransferStrategy public transferStrategy;
 
     address public sSupplyTokenAddress;
@@ -40,7 +41,7 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
 
         _openLendingPoolMarket();
 
-        oracle = new MockAaveOracle();
+        aggregatorProxy = new MockEACAggregatorProxy();
         transferStrategy = new MockTransferStrategy();
 
         address emissionManager = REWARDS_CONTROLLER.getEmissionManager();
@@ -159,7 +160,7 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         assets[0] = address(supplyToken);
 
         address[] memory sources = new address[](1);
-        sources[0] = address(oracle);
+        sources[0] = address(aggregatorProxy);
 
         ConfiguratorInputTypes.InitReserveInput[] memory reserveConfig =
             new ConfiguratorInputTypes.InitReserveInput[](1);
@@ -198,13 +199,13 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         returns (RewardsDataTypes.RewardsConfigInput memory)
     {
         return RewardsDataTypes.RewardsConfigInput({
-            emissionPerSecond: 1 ether,
+            emissionPerSecond: 1_000_000,
             totalSupply: 0,
             distributionEnd: type(uint32).max,
             asset: asset,
             reward: address(rewardToken),
             transferStrategy: ITransferStrategyBase(address(transferStrategy)),
-            rewardOracle: IEACAggregatorProxy(address(oracle))
+            rewardOracle: IEACAggregatorProxy(address(aggregatorProxy))
         });
     }
 

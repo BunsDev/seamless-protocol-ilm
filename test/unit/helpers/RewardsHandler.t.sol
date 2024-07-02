@@ -14,6 +14,8 @@ import { TestConstants } from "../../config/TestConstants.sol";
 import "forge-std/console.sol";
 
 contract RewardsHandler is Test, TestConstants {
+    uint256 public constant MIN_REDEEM_AMOUNT = 1e7;
+
     ILoopStrategy public immutable strategy;
     IPool public immutable pool;
     IRewardsController public immutable rewardsController;
@@ -77,13 +79,9 @@ contract RewardsHandler is Test, TestConstants {
 
         strategyUnderlying.approve(address(strategy), amount);
 
-        // Sometimes deposit fails. In that case we just skip. This is required to make sure test does not revert
-        try strategy.deposit(amount, user) returns (uint256 shares) {
-            supplyToken.approve(address(pool), shares);
-            pool.deposit(address(supplyToken), shares, user, 0);
-        } catch {
-            console.log("Strategy deposit failed");
-        }
+        uint256 shares = strategy.deposit(amount, user);
+        supplyToken.approve(address(pool), shares);
+        pool.deposit(address(supplyToken), shares, user, 0);
 
         vm.warp(block.timestamp + timeToPass);
     }
@@ -96,18 +94,14 @@ contract RewardsHandler is Test, TestConstants {
 
         (, address user,) = vm.readCallers();
 
-        if (strategy.balanceOf(user) == 0) {
+        if (strategy.balanceOf(user) <= MIN_REDEEM_AMOUNT) {
             return;
         }
 
-        amount = bound(amount, 1, strategy.balanceOf(user));
+        amount = bound(amount, MIN_REDEEM_AMOUNT, strategy.balanceOf(user));
 
-        // Sometimes redeem fails because of small amounts. In that case we just skip
-        try strategy.redeem(amount, user, user) {
-            pool.withdraw(address(supplyToken), amount, user);
-        } catch {
-            console.log("Strategy redeem failed");
-        }
+        strategy.redeem(amount, user, user);
+        pool.withdraw(address(supplyToken), amount, user);
 
         vm.warp(block.timestamp + timeToPass);
     }
@@ -140,7 +134,7 @@ contract RewardsHandler is Test, TestConstants {
         uint256 fromActorIndex,
         uint256 toActorIndex,
         uint8 timeToPass
-    ) external useActor(fromActorIndex) {
+    ) public useActor(fromActorIndex) {
         toActorIndex = bound(toActorIndex, 0, actors.length - 1);
         timeToPass = uint8(bound(uint256(timeToPass), 0, 100_000));
 
