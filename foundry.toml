@@ -10,6 +10,7 @@ block_number = 5950437
 verbosity = 2
 evm_version = "paris"
 fs_permissions = [{ access = "write", path = "./"}]
+gas_limit = 10000000000000
 
 [fmt]
 line_length = 80

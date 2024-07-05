@@ -12,7 +12,8 @@ gas-check               :; forge snapshot --check --tolerance 1
 snapshot                :; forge snapshot
 clean                   :; forge clean
 fmt                     :; forge fmt
-test                    :; forge test -vvv --no-match-test test_e2eSimulation --gas-report && forge test -vvv --mt test_e2eSimulation
+run-simulation          :; mkdir -p ./test/integration/output && forge test -vvv --mt test_e2eSimulation
+test                    :; forge test -vvv --no-match-test test_e2eSimulation --gas-report
 
 # Deploy
 deploy-wrappedwstETH-base-mainnet 								:; forge script script/deploy/base-mainnet/DeployWrappedwstETH.s.sol --tc DeployWrappedwstETH --force --rpc-url base --chain base --slow --broadcast --verify --delay 5 -vvvv

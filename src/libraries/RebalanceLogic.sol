@@ -119,6 +119,10 @@ library RebalanceLogic {
                             - USDWadRayMath.USD
                     )
                 );
+
+                // because usdDiv can round up, in some cases when user has all the strategy shares,
+                // calculated shareDebtUSD can be bigger by 1 than state.debtUSD
+                if (shareDebtUSD > state.debtUSD) shareDebtUSD = state.debtUSD;
             }
 
             uint256 initialEquityUSD = state.collateralUSD - state.debtUSD;

@@ -18,12 +18,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-          
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-      
+
       - name: Run Forge Format
         run: |
           forge fmt --check
@@ -36,15 +36,15 @@ jobs:
         id: build
 
       - name: Run Unit Tests
-        env: 
+        env:
           BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
         run: |
-          forge test -vvv --no-match-test test_e2eSimulation --gas-report
+          make test
         id: test
-      
+
       - name: Run End-to-End Simulation Test
         env:
-         BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
         run: |
-         forge test -vvv --mt test_e2eSimulation
-        id: simulation        
+          make run-simulation
+        id: simulation
