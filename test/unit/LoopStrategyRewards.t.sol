@@ -36,6 +36,8 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
     address public sSupplyTokenAddress;
     RewardsHandler public rewardsHandler;
 
+    uint88 public constant EMISSION_PER_SECOND = 1_000_000;
+
     function setUp() public override {
         super.setUp();
 
@@ -77,7 +79,7 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         _depositFor(alice, depositAmount);
 
         uint256 timeToPass = 1 days;
-        uint256 totalDistributedRewards = timeToPass * 1 ether;
+        uint256 totalDistributedRewards = timeToPass * EMISSION_PER_SECOND;
         vm.warp(block.timestamp + timeToPass);
 
         address[] memory assets = new address[](1);
@@ -185,7 +187,7 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         returns (RewardsDataTypes.RewardsConfigInput memory)
     {
         return RewardsDataTypes.RewardsConfigInput({
-            emissionPerSecond: 1_000_000,
+            emissionPerSecond: EMISSION_PER_SECOND,
             totalSupply: 0,
             distributionEnd: type(uint32).max,
             asset: asset,
