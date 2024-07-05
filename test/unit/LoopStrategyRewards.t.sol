@@ -25,7 +25,8 @@ import { DataTypes } from
     "@aave/contracts/protocol/libraries/types/DataTypes.sol";
 import { RewardsHandler } from "./helpers/RewardsHandler.t.sol";
 import { MockEACAggregatorProxy } from "../mock/MockEACAggregatorProxy.sol";
-import "forge-std/console.sol";
+import { IPoolAddressesProvider } from
+    "@aave/contracts/interfaces/IPoolAddressesProvider.sol";
 
 contract LoopStrategyDepositTest is LoopStrategyTest {
     ERC20Mock public supplyToken = new ERC20Mock();
@@ -89,6 +90,18 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         );
 
         assertEq(userRewards, totalDistributedRewards - 1);
+    }
+
+    function test_HandleAction_notRevertingIfRewardsControllerNotSet() public {
+        bytes32 INCENTIVES_CONTROLLER = keccak256("INCENTIVES_CONTROLLER");
+
+        IPoolAddressesProvider addressesProvider =
+            IPoolAddressesProvider(SEAMLESS_ADDRESS_PROVIDER_BASE_MAINNET);
+        vm.prank(SEAMLESS_GOV_SHORT_TIMELOCK_ADDRESS);
+        addressesProvider.setAddress(INCENTIVES_CONTROLLER, address(0));
+
+        // this will call _handeAction which must not revert
+        _depositFor(alice, 5 ether);
     }
 
     function invariant_LoopStrategyRewards_equalToPoolRewards() public {

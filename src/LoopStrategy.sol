@@ -730,6 +730,9 @@ contract LoopStrategy is
         IRewardsController rewardsController = IRewardsController(
             poolAddressProvider.getAddress(INCENTIVES_CONTROLLER)
         );
-        rewardsController.handleAction(user, totalSupply, oldUserBalance);
+
+        if (address(rewardsController) != address(0)) {
+            rewardsController.handleAction(user, totalSupply, oldUserBalance);
+        }
     }
 }
