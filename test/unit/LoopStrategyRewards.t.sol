@@ -91,10 +91,7 @@ contract LoopStrategyDepositTest is LoopStrategyTest {
         assertEq(userRewards, totalDistributedRewards - 1);
     }
 
-    /// forge-config: default.invariant.runs = 1
-    /// forge-config: default.invariant.depth = 100
-    /// forge-config: default.invariant.fail-on-revert = true
-    function invariant_MultipleActions() public {
+    function invariant_LoopStrategyRewards_equalToPoolRewards() public {
         address[] memory actors = rewardsHandler.getActors();
 
         for (uint256 i = 0; i < actors.length; i++) {

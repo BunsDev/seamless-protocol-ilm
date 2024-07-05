@@ -11,7 +11,6 @@ import { DataTypes } from
     "@aave/contracts/protocol/libraries/types/DataTypes.sol";
 import { Test } from "forge-std/Test.sol";
 import { TestConstants } from "../../config/TestConstants.sol";
-import "forge-std/console.sol";
 
 contract RewardsHandler is Test, TestConstants {
     uint256 public constant MIN_REDEEM_AMOUNT = 1e7;

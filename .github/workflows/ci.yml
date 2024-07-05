@@ -48,3 +48,10 @@ jobs:
         run: |
           make run-simulation
         id: simulation
+
+      - name: Run ILM Rewards Invariant Test
+        env:
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+        run: |
+          make test-invariant-rewards
+        id: invariant-rewards-test

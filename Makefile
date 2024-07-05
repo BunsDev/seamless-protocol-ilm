@@ -12,8 +12,10 @@ gas-check               :; forge snapshot --check --tolerance 1
 snapshot                :; forge snapshot
 clean                   :; forge clean
 fmt                     :; forge fmt
-run-simulation          :; mkdir -p ./test/integration/output && forge test -vvv --mt test_e2eSimulation
-test                    :; forge test -vvv --no-match-test test_e2eSimulation --gas-report
+run-simulation          :; mkdir -p ./test/integration/output && forge test --mt test_e2eSimulation
+test-invariant-rewards  :; forge test --mt invariant_LoopStrategyRewards
+test        						:; forge test --no-match-test "test_e2eSimulation|invariant" --gas-report $(VERBOSITY)
+test-verbose       			:; make test VERBOSITY="-vvv"
 
 # Deploy
 deploy-wrappedwstETH-base-mainnet 								:; forge script script/deploy/base-mainnet/DeployWrappedwstETH.s.sol --tc DeployWrappedwstETH --force --rpc-url base --chain base --slow --broadcast --verify --delay 5 -vvvv

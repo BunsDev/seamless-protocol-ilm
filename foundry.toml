@@ -12,6 +12,11 @@ evm_version = "paris"
 fs_permissions = [{ access = "write", path = "./"}]
 gas_limit = 10000000000000
 
+[invariant]
+runs = 5
+depth = 100
+fail_on_revert = true
+
 [fmt]
 line_length = 80
 bracket_spacing = true
