@@ -12,6 +12,8 @@ import { DataTypes } from
 import { Test } from "forge-std/Test.sol";
 import { TestConstants } from "../../config/TestConstants.sol";
 
+import "forge-std/console.sol";
+
 contract RewardsHandler is Test, TestConstants {
     uint256 public constant MIN_REDEEM_AMOUNT = 1e7;
 
@@ -80,6 +82,8 @@ contract RewardsHandler is Test, TestConstants {
         supplyToken.approve(address(pool), shares);
         pool.deposit(address(supplyToken), shares, user, 0);
 
+        console.log(user, "deposit ", shares);
+
         skip(timeToPass);
     }
 
@@ -96,6 +100,9 @@ contract RewardsHandler is Test, TestConstants {
         }
 
         amount = bound(amount, MIN_REDEEM_AMOUNT, strategy.balanceOf(user));
+
+        console.log(user);
+        console.log("withdraw", MIN_REDEEM_AMOUNT, strategy.balanceOf(user), amount);
 
         strategy.redeem(amount, user, user);
         pool.withdraw(address(supplyToken), amount, user);
