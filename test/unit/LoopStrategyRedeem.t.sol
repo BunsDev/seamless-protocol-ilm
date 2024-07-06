@@ -799,4 +799,25 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         assertLt(receivedAssets, equityBeforeRedeem);
         assertGt(strategy.collateralUSD(), 0);
     }
+
+    function test_redeem_redeemingAlmostAllShares() public {
+        address user = address(1);
+
+        uint256 depositAmount1 = 2000000000000007035;
+        uint256 timeToPass1 = 80;
+
+        uint256 depositAmount2 = 2000000003512598611;
+        uint256 timeToPass2 = 218;
+
+        uint256 redeemAmount = 3980676093581368705;
+
+        uint256 shares1 = _depositFor(user, depositAmount1);
+        skip(timeToPass1);
+
+        uint256 shares2 = _depositFor(user, depositAmount2);
+        skip(timeToPass2);
+
+        vm.prank(user);
+        strategy.redeem(redeemAmount, user, user);
+    }
 }
