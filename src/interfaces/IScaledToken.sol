@@ -1,7 +1,10 @@
-// SPDX-License-Identifier: BUSL-1.1
-
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.21;
 
+/// @title IScaledToken
+/// @author Aave, modified by Seamless Protocol
+/// @notice Part of the IScaledBalanceToken interface used by RewardsDistributor
+/// @notice https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/IScaledBalanceToken.sol
 interface IScaledToken {
     /// @notice returns total supply of strategy shares
     /// @dev this function returns the same value as totalSupply
