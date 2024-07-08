@@ -23,6 +23,8 @@ import {
     CollateralRatio
 } from "../types/DataTypes.sol";
 
+import 'forge-std/console.sol';
+
 /// @title RebalanceLogic
 /// @notice Contains all logic required for rebalancing
 library RebalanceLogic {
@@ -99,6 +101,9 @@ library RebalanceLogic {
         (uint256 shareDebtUSD, uint256 shareEquityUSD) =
             LoanLogic.shareDebtAndEquity(state, shares, totalShares);
 
+        console.log("shareEquityUSD", shareEquityUSD);
+        console.log("ilm equity", state.collateralUSD - state.debtUSD);
+
         if (
             RebalanceMath.collateralRatioUSD(
                 state.collateralUSD - shareEquityUSD, state.debtUSD
@@ -149,6 +154,10 @@ library RebalanceLogic {
             IERC20Metadata(address($.assets.collateral)).decimals(),
             Math.Rounding.Floor
         );
+
+        console.log("shareEquityAsset", shareEquityAsset);
+        console.log("shareEquityUSD", shareEquityUSD);
+        console.log("strategyEquity", state.collateralUSD - state.debtUSD);
 
         // withdraw and transfer equity asset amount
         LoanLogic.withdraw($.lendingPool, $.assets.collateral, shareEquityAsset);
@@ -551,6 +560,8 @@ library RebalanceLogic {
         uint256 remainingDebtUSD = state.debtUSD - targetDebtUSD;
         uint256 count;
 
+        console.log("target", targetDebtUSD);
+
         do {
             uint256 collateralAmountAsset = RebalanceMath
                 .calculateCollateralAsset(
@@ -560,6 +571,8 @@ library RebalanceLogic {
                 collateralDecimals
             );
 
+            console.log("collateralAmountAsset", collateralAmountAsset);
+
             if (collateralAmountAsset == 0) {
                 break;
             }
@@ -567,6 +580,8 @@ library RebalanceLogic {
             uint256 borrowAmountAsset = withdrawAndSwapCollateral(
                 $, collateralAmountAsset, maxSwapSlippage
             );
+
+            console.log("borrowAmountAsset", borrowAmountAsset);
 
             if (borrowAmountAsset == 0) {
                 break;
@@ -584,6 +599,8 @@ library RebalanceLogic {
                 break;
             }
         } while (targetDebtUSD < state.debtUSD);
+
+        console.log("final", state.debtUSD);
     }
 
     /// @notice withrdraws an amount of collateral asset and exchanges it for an
