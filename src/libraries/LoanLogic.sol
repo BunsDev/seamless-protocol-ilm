@@ -261,7 +261,7 @@ library LoanLogic {
         LendingPool memory lendingPool,
         IERC20 debtAsset,
         uint256 debtAssetPrice
-    ) internal view returns (uint256 maxBorrowUSD) {
+    ) external view returns (uint256 maxBorrowUSD) {
         uint256 availableAssetSupplyUSD = ConversionMath.convertAssetToUSD(
             getAvailableAssetSupply(lendingPool, debtAsset),
             debtAssetPrice,
@@ -283,7 +283,7 @@ library LoanLogic {
     function getSToken(
         IPoolAddressesProvider poolAddressesProvider,
         IERC20 asset
-    ) internal view returns (IAToken sToken) {
+    ) external view returns (IAToken sToken) {
         IPoolDataProvider poolDataProvider =
             IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());
 

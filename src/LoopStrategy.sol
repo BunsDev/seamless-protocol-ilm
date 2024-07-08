@@ -612,6 +612,7 @@ contract LoopStrategy is
         _tryRebalance();
 
         uint256 totalSupply = totalSupply();
+
         (, uint256 initialShareEquityUSD) = LoanLogic.shareDebtAndEquity(
             LoanLogic.getLoanState($.lendingPool), shares, totalSupply
         );
@@ -636,11 +637,7 @@ contract LoopStrategy is
         _withdraw(_msgSender(), receiver, owner, shareUnderlyingAsset, shares);
 
         emit WithdrawUnrealized(
-            _msgSender(),
-            receiver,
-            owner,
-            _convertCollateralToUnderlyingAsset($.assets, initialShareEquityUSD),
-            shares
+            _msgSender(), receiver, owner, initialShareEquityUSD, shares
         );
 
         return shareUnderlyingAsset;
