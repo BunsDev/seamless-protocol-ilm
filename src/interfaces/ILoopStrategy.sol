@@ -75,6 +75,36 @@ interface ILoopStrategy is IERC4626 {
     /// @notice emitted when a new value for the swapper address is set
     /// @param swapper new address of swapper contract
     event SwapperSet(address swapper);
+    
+    /// @notice emitted when a deposit action is called
+    /// @param depositor address depositing assets
+    /// @param receiver address receiving shares
+    /// @param depositedEquityAsset equity deposited minus costs for rebalancing in asset terms
+    /// @param sharesReceived amount of shares received for deposit
+    event DepositRealized(
+        address depositor,
+        address receiver,
+        uint256 depositedEquityAsset,
+        uint256 sharesReceived
+    );
+
+    /// @notice emitted when a deposit action is called
+    /// @param withdrawer address performing withdrawal
+    /// @param receiver address receiving equity corresponding to burnt shares
+    /// @param shareEquityAsset equity corresponding to shares in assest terms without rebalancing costs deducted
+    /// @param sharesBurnt burnt shares for withdrawal
+    event WithdrawUnrealized(
+        address withdrawer,
+        address receiver,
+        address owner,
+        uint256 shareEquityAsset,
+        uint256 sharesBurnt
+    );
+
+    /// @notice emitted when a strategy wide rebalance is performed which is not owed to a user action
+    /// @param initialEquityAsset equity prior to rebalance in underlying asset terms
+    /// @param finalEquityAsset equity after rebalance in underlying asset terms
+    event Rebalance(uint256 initialEquityAsset, uint256 finalEquityAsset);
 
     /// @notice emitted when a new value for maxSlippageOnRebalanceSet is set
     /// @param maxSlippage new value for maximum allowed slippage percentage (1e8 is 100%)

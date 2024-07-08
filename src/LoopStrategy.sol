@@ -510,12 +510,16 @@ contract LoopStrategy is
         if (rebalanceNeeded()) {
             Storage.Layout storage $ = Storage.layout();
 
+            uint256 initialEquity = equity();
+
             RebalanceLogic.rebalanceTo(
                 $,
                 LoanLogic.getLoanState($.lendingPool),
                 $.collateralRatioTargets.target,
                 $.maxSlippageOnRebalance
             );
+
+            emit Rebalance(initialEquity, equity());
         }
     }
 
@@ -563,6 +567,8 @@ contract LoopStrategy is
         _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
+        emit DepositRealized(msg.sender, receiver, equityReceived, shares);
+
         return shares;
     }
 
@@ -583,11 +589,16 @@ contract LoopStrategy is
 
         _tryRebalance();
 
+        uint256 totalSupply = totalSupply();
+        (, uint256 initialShareEquityUSD) = LoanLogic.shareDebtAndEquity(
+            LoanLogic.getLoanState($.lendingPool), shares, totalSupply
+        );
+
         // MAX_SLIPPAGE is allowed because we check minUnderlyingAsset received
         uint256 shareUnderlyingAsset = _convertCollateralToUnderlyingAsset(
             $.assets,
             RebalanceLogic.rebalanceBeforeWithdraw(
-                $, shares, totalSupply(), Constants.MAX_SLIPPAGE
+                $, shares, totalSupply, Constants.MAX_SLIPPAGE
             )
         );
 
@@ -601,6 +612,14 @@ contract LoopStrategy is
 
         // burn shares from owner and send corresponding underlying asset ammount to receiver
         _withdraw(_msgSender(), receiver, owner, shareUnderlyingAsset, shares);
+
+        emit WithdrawUnrealized(
+            _msgSender(),
+            receiver,
+            owner,
+            _convertCollateralToUnderlyingAsset($.assets, initialShareEquityUSD),
+            shares
+        );
 
         return shareUnderlyingAsset;
     }
