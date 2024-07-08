@@ -75,7 +75,7 @@ interface ILoopStrategy is IERC4626 {
     /// @notice emitted when a new value for the swapper address is set
     /// @param swapper new address of swapper contract
     event SwapperSet(address swapper);
-    
+
     /// @notice emitted when a deposit action is called
     /// @param depositor address depositing assets
     /// @param receiver address receiving shares
