@@ -72,12 +72,13 @@ contract RewardsHandler is Test, TestConstants {
 
         (, address user,) = vm.readCallers();
 
-        deal(address(supplyToken), user, amount);
         deal(address(strategyUnderlying), user, amount);
 
         strategyUnderlying.approve(address(strategy), amount);
 
         uint256 shares = strategy.deposit(amount, user);
+
+        deal(address(supplyToken), user, shares);
         supplyToken.approve(address(pool), shares);
         pool.deposit(address(supplyToken), shares, user, 0);
 
