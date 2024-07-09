@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import { ISwapAdapter } from "../../interfaces/ISwapAdapter.sol";
@@ -10,15 +10,11 @@ import { ISwapAdapter } from "../../interfaces/ISwapAdapter.sol";
 /// @title SwapAdapterBase
 /// @notice Base adapter contract for all swap adapters
 /// @dev should be inherited and overridden by all SwapAdapter implementations
-abstract contract SwapAdapterBase is Ownable2Step, ISwapAdapter {
-    address public swapper;
-
-    modifier onlySwapper() {
-        if (swapper != msg.sender) {
-            revert NotSwapper();
-        }
-        _;
-    }
+abstract contract SwapAdapterBase is AccessControl, ISwapAdapter {
+    /// @dev role which can deposit to this contract to wrap underlying token
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    /// @dev role which can call `executeSwap`
+    bytes32 public constant SWAPPER_ROLE = keccak256("SWAPPER_ROLE");
 
     /// @notice swaps a given amount of a token to another token, sending the final amount to the beneficiary
     /// @param from address of token to swap from
@@ -33,13 +29,5 @@ abstract contract SwapAdapterBase is Ownable2Step, ISwapAdapter {
         address payable beneficiary
     ) internal virtual returns (uint256 toAmount) {
         // override with adapter specific swap logic
-    }
-
-    /// @notice sets the address of the Swapper contract
-    /// @param _swapper address of Swapper contract
-    function _setSwapper(address _swapper) internal virtual {
-        swapper = _swapper;
-
-        emit SwapperSet(_swapper);
     }
 }

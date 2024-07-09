@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.21;
 
+import { IAccessControl } from
+    "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {
     Ownable2StepUpgradeable,
@@ -40,8 +42,8 @@ contract WrappedTokenAdapterTest is BaseForkTest {
 
     uint256 swapAmount = 1 ether;
     address alice = makeAddr("alice");
-    address public OWNER = makeAddr("OWNER");
-    address public NON_OWNER = makeAddr("NON_OWNER");
+    address public MANAGER = makeAddr("MANAGER");
+    address public NON_MANAGER = makeAddr("NON_MANAGER");
 
     WrappedTokenAdapter adapter;
     WrappedERC20PermissionedDeposit public wrappedToken;
@@ -51,17 +53,18 @@ contract WrappedTokenAdapterTest is BaseForkTest {
     /// well as setting deposit permission for the adapter on the
     /// WrappedERC20PermissionedDeposit contract
     function setUp() public {
-        adapter = new WrappedTokenAdapter(OWNER, alice);
+        adapter = new WrappedTokenAdapter(MANAGER, alice);
 
         mockERC20 = new MockERC20("Mock", "M");
         wrappedToken = new WrappedERC20PermissionedDeposit(
-            "WrappedMock", "WM", IERC20(mockERC20), OWNER
+            "WrappedMock", "WM", IERC20(mockERC20), MANAGER
         );
 
         deal(address(mockERC20), address(alice), 100 ether);
 
-        vm.startPrank(OWNER);
+        vm.startPrank(MANAGER);
         wrappedToken.grantRole(wrappedToken.DEPOSITOR_ROLE(), address(adapter));
+        adapter.grantRole(adapter.MANAGER_ROLE(), MANAGER);
         vm.stopPrank();
     }
 
@@ -73,7 +76,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         uint256 oldFromBalance = mockERC20.balanceOf(alice);
         uint256 oldToBalance = wrappedToken.balanceOf(alice);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
 
         vm.prank(alice);
@@ -100,7 +103,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         uint256 oldFromBalance = mockERC20.balanceOf(alice);
         uint256 oldToBalance = wrappedToken.balanceOf(alice);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
 
         vm.prank(alice);
@@ -141,18 +144,26 @@ contract WrappedTokenAdapterTest is BaseForkTest {
     /// @dev ensures that executeSwap call reverts is the caller is not a whitelisted
     /// swapper
     function test_executeSwap_revertsWhen_callerIsNotSwapper() public {
-        vm.prank(OWNER);
+        vm.startPrank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
-        vm.prank(OWNER);
-        adapter.setSwapper(OWNER);
+        adapter.grantRole(adapter.SWAPPER_ROLE(), MANAGER);
+        adapter.revokeRole(adapter.SWAPPER_ROLE(), alice);
+        assertEq(adapter.hasRole(adapter.SWAPPER_ROLE(), alice), false);
+        vm.stopPrank();
 
-        vm.prank(alice);
+        vm.startPrank(alice);
         mockERC20.approve(address(adapter), swapAmount);
 
-        vm.expectRevert(ISwapAdapter.NotSwapper.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                adapter.SWAPPER_ROLE()
+            )
+        );
 
-        vm.prank(alice);
         adapter.executeSwap(mockERC20, wrappedToken, swapAmount, payable(alice));
+        vm.stopPrank();
     }
 
     /// @dev ensures that setting a wrapper will set it for both orderings (from, to) and (to,from)
@@ -168,7 +179,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         vm.expectEmit();
         emit WrapperSet(wrappedToken, mockERC20, wrappedToken);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
 
         address wrapperFromTo =
@@ -192,7 +203,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         vm.expectEmit();
         emit WrapperSet(wrappedToken, mockERC20, wrappedToken);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
 
         address wrapperFromTo =
@@ -209,21 +220,24 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         vm.expectEmit();
         emit WrapperRemoved(wrappedToken, mockERC20);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
     }
 
-    /// @dev ensures that setting a wrapper will revert when called by non-owner
-    function test_setWrapper_revertsWhen_callerIsNotOwner() public {
+    /// @dev ensures that setting a wrapper will revert when caller does not have
+    /// manager role
+    function test_setWrapper_revertsWhen_callerIsNotManager() public {
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
-
-        vm.prank(NON_OWNER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
+
+        vm.stopPrank();
     }
 
     /// @dev ensures that removing a wrapper will remove the wrapper set for both
@@ -231,7 +245,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
     /// events
     function test_removeWrapper_removesPreviouslySetWrapperBothTokenOrderings_and_emitsWrapperRemovedEvent(
     ) public {
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setWrapper(mockERC20, wrappedToken, wrappedToken);
 
         vm.expectEmit();
@@ -239,7 +253,7 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         vm.expectEmit();
         emit WrapperRemoved(wrappedToken, mockERC20);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.removeWrapper(mockERC20, wrappedToken);
 
         address wrapperFromTo =
@@ -252,30 +266,19 @@ contract WrappedTokenAdapterTest is BaseForkTest {
         assertEq(wrapperToFrom, address(0));
     }
 
-    /// @dev ensures that removing a wrapper will revert if called by a
-    /// non-owner
-    function test_removeWrapper_revertsWhen_callerIsNotOwner() public {
+    /// @dev ensures that removing a wrapper will revert if caller does not have
+    /// manager role
+    function test_removeWrapper_revertsWhen_callerIsNotManager() public {
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
-
-        vm.prank(NON_OWNER);
         adapter.removeWrapper(mockERC20, wrappedToken);
-    }
 
-    /// @dev ensures that setSwapper call reverts when calls is not owner
-    function test_setSwapper_revertsWhen_callerIsNotOwner() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
-            )
-        );
-
-        vm.prank(NON_OWNER);
-        adapter.setSwapper(NON_OWNER);
+        vm.stopPrank();
     }
 }

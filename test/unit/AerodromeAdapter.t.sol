@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.21;
 
+import { IAccessControl } from
+    "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {
     Ownable2StepUpgradeable,
@@ -12,6 +14,8 @@ import { BaseForkTest } from "../BaseForkTest.t.sol";
 import { ISwapAdapter } from "../../src/interfaces/ISwapAdapter.sol";
 import { AerodromeAdapter } from "../../src/swap/adapter/AerodromeAdapter.sol";
 import { IRouter } from "../../src/vendor/aerodrome/IRouter.sol";
+
+import "forge-std/console.sol";
 
 /// @title AerodromeAdapterTEst
 /// @notice Unit tests for the AerodromeAdapter contract
@@ -50,15 +54,19 @@ contract AerodromeAdapterTest is BaseForkTest {
 
     uint256 swapAmount = 1 ether;
     address alice = makeAddr("alice");
-    address public OWNER = makeAddr("OWNER");
-    address public NON_OWNER = makeAddr("NON_OWNER");
+    address public MANAGER = makeAddr("MANAGER");
+    address public NON_MANAGER = makeAddr("NON_MANAGER");
 
     AerodromeAdapter adapter;
 
     function setUp() public {
         adapter = new AerodromeAdapter(
-            OWNER, AERODROME_ROUTER, AERODROME_FACTORY, alice
+            MANAGER, AERODROME_ROUTER, AERODROME_FACTORY, alice
         );
+
+        vm.startPrank(MANAGER);
+        adapter.grantRole(adapter.MANAGER_ROLE(), MANAGER);
+        vm.stopPrank();
 
         deal(address(WETH), address(alice), 100 ether);
     }
@@ -79,7 +87,7 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setRoutes(WETH, CbETH, routes);
 
         vm.prank(alice);
@@ -107,18 +115,26 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(OWNER);
+        vm.startPrank(MANAGER);
         adapter.setRoutes(WETH, CbETH, routes);
-        vm.prank(OWNER);
-        adapter.setSwapper(OWNER);
+        adapter.grantRole(adapter.SWAPPER_ROLE(), MANAGER);
+        adapter.revokeRole(adapter.SWAPPER_ROLE(), alice);
+        assertEq(adapter.hasRole(adapter.SWAPPER_ROLE(), alice), false);
+        vm.stopPrank();
 
-        vm.prank(alice);
+        vm.startPrank(alice);
         WETH.approve(address(adapter), swapAmount);
 
-        vm.expectRevert(ISwapAdapter.NotSwapper.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                adapter.SWAPPER_ROLE()
+            )
+        );
 
-        vm.prank(alice);
         adapter.executeSwap(WETH, CbETH, swapAmount, payable(alice));
+        vm.stopPrank();
     }
 
     /// @dev ensures setRoutes sets the new route and emits the appropriate event
@@ -136,7 +152,7 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
         emit RoutesSet(WETH, CbETH, routes);
@@ -160,10 +176,10 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setRoutes(WETH, CbETH, routes);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
         emit RoutesRemoved(WETH, CbETH);
@@ -171,8 +187,8 @@ contract AerodromeAdapterTest is BaseForkTest {
         adapter.setRoutes(WETH, CbETH, routes);
     }
 
-    /// @dev ensures setRoutes reverts when called by non owner
-    function test_setRoutes_revertsWhen_calledByNonOwner() public {
+    /// @dev ensures setRoutes reverts when caller does not have manager role
+    function test_setRoutes_revertsWhen_callerIsNotManager() public {
         IRouter.Route[] memory routes = new IRouter.Route[](1);
 
         routes[0] = IRouter.Route({
@@ -182,14 +198,16 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(NON_OWNER);
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
         adapter.setRoutes(WETH, CbETH, routes);
+        vm.stopPrank();
     }
 
     /// @dev ensures removeRoutes deletes previously set routes and emits the appropriate event
@@ -204,12 +222,12 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
         adapter.setRoutes(WETH, CbETH, routes);
 
         assertEq(adapter.getSwapRoutes(WETH, CbETH).length, 1);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
         emit RoutesRemoved(WETH, CbETH);
@@ -219,8 +237,8 @@ contract AerodromeAdapterTest is BaseForkTest {
         assertEq(adapter.getSwapRoutes(WETH, CbETH).length, 0);
     }
 
-    /// @dev ensures removeRoutes reverts when called by non owner
-    function test_removeRoutes_revertsWhen_calledByNonOwner() public {
+    /// @dev ensures removeRoutes reverts when caller does not have manager role
+    function test_removeRoutes_revertsWhen_callerIsNotManager() public {
         IRouter.Route[] memory routes = new IRouter.Route[](1);
 
         routes[0] = IRouter.Route({
@@ -230,15 +248,17 @@ contract AerodromeAdapterTest is BaseForkTest {
             factory: AERODROME_FACTORY
         });
 
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
 
-        vm.prank(NON_OWNER);
         adapter.setRoutes(WETH, CbETH, routes);
+        vm.stopPrank();
     }
 
     /// @dev ensures setIsPoolStable sets the value for the stability of a pool
@@ -247,7 +267,7 @@ contract AerodromeAdapterTest is BaseForkTest {
     ) public {
         assertEq(adapter.isPoolStable(WETH, CbETH), false);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
         emit IsPoolStableSet(WETH, CbETH, true);
@@ -257,18 +277,19 @@ contract AerodromeAdapterTest is BaseForkTest {
         assertEq(adapter.isPoolStable(WETH, CbETH), true);
     }
 
-    /// @dev ensures setIsPoolStable reverts when called by non owner
-    function test_setIsPoolStable_revertsWhen_CallerIsNotOwner() public {
-        vm.prank(NON_OWNER);
-
+    /// @dev ensures setIsPoolStable reverts caller does not have manager role
+    function test_setIsPoolStable_revertsWhen_callerIsNotManager() public {
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
 
         adapter.setIsPoolStable(WETH, CbETH, true);
+        vm.stopPrank();
     }
 
     /// @dev ensures setPoolFactory sets the new address for the Aerodrome router
@@ -278,26 +299,28 @@ contract AerodromeAdapterTest is BaseForkTest {
     {
         assertEq(adapter.router(), AERODROME_ROUTER);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
-        emit RouterSet(OWNER);
+        emit RouterSet(MANAGER);
 
-        adapter.setRouter(OWNER);
+        adapter.setRouter(MANAGER);
     }
 
-    /// @dev ensures setRouter reverts when called by non owner
-    function test_setRouter_revertsWhen_CallerIsNotOwner() public {
-        vm.prank(NON_OWNER);
-
+    /// @dev ensures setRouter reverts when caller does not have manager role
+    function test_setRouter_revertsWhen_callerIsNotManager() public {
+        vm.startPrank(NON_MANAGER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
 
-        adapter.setRouter(OWNER);
+        adapter.setRouter(MANAGER);
+
+        vm.stopPrank();
     }
 
     /// @dev ensures setPoolFactory sets the new address for the Aerodrome pool factory
@@ -306,39 +329,27 @@ contract AerodromeAdapterTest is BaseForkTest {
     ) public {
         assertEq(adapter.poolFactory(), AERODROME_FACTORY);
 
-        vm.prank(OWNER);
+        vm.prank(MANAGER);
 
         vm.expectEmit();
-        emit PoolFactorySet(OWNER);
+        emit PoolFactorySet(MANAGER);
 
-        adapter.setPoolFactory(OWNER);
+        adapter.setPoolFactory(MANAGER);
     }
 
-    /// @dev ensures setPoolFactory reverts when called by non owner
-    function test_setPoolFactory_revertsWhen_CallerIsNotOwner() public {
-        vm.prank(NON_OWNER);
+    /// @dev ensures setPoolFactory reverts when caller does not have manager role
+    function test_setPoolFactory_revertsWhen_callerIsNotManager() public {
+        vm.startPrank(NON_MANAGER);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                NON_MANAGER,
+                adapter.MANAGER_ROLE()
             )
         );
 
-        adapter.setPoolFactory(OWNER);
-    }
-
-    /// @dev ensures that setSwapper reverts if the caller is not the owner
-    function test_setSwapper_revertsWhen_callerNotOwner() public {
-        vm.prank(NON_OWNER);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                NON_OWNER
-            )
-        );
-
-        adapter.setSwapper(NON_OWNER);
+        adapter.setPoolFactory(MANAGER);
+        vm.stopPrank();
     }
 }

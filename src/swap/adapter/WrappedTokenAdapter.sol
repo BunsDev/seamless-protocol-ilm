@@ -32,8 +32,9 @@ contract WrappedTokenAdapter is SwapAdapterBase, IWrappedTokenAdapter {
             => mapping(IERC20 to => IWrappedERC20PermissionedDeposit wrapper)
     ) public wrappers;
 
-    constructor(address owner, address swapper) Ownable(owner) {
-        _setSwapper(swapper);
+    constructor(address initialAdmin, address swapper) {
+        _grantRole(SWAPPER_ROLE, swapper);
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -42,7 +43,7 @@ contract WrappedTokenAdapter is SwapAdapterBase, IWrappedTokenAdapter {
         IERC20 to,
         uint256 fromAmount,
         address payable beneficiary
-    ) external onlySwapper returns (uint256 toAmount) {
+    ) external onlyRole(SWAPPER_ROLE) returns (uint256 toAmount) {
         from.transferFrom(msg.sender, address(this), fromAmount);
 
         IWrappedERC20PermissionedDeposit wrapper = wrappers[from][to];
@@ -61,17 +62,12 @@ contract WrappedTokenAdapter is SwapAdapterBase, IWrappedTokenAdapter {
         return fromAmount;
     }
 
-    /// @inheritdoc ISwapAdapter
-    function setSwapper(address swapper) external onlyOwner {
-        _setSwapper(swapper);
-    }
-
     /// @inheritdoc IWrappedTokenAdapter
     function setWrapper(
         IERC20 from,
         IERC20 to,
         IWrappedERC20PermissionedDeposit wrapper
-    ) external onlyOwner {
+    ) external onlyRole(MANAGER_ROLE) {
         if (address(wrappers[from][to]) != address(0)) {
             _removeWrapper(from, to);
         }
@@ -84,7 +80,10 @@ contract WrappedTokenAdapter is SwapAdapterBase, IWrappedTokenAdapter {
     }
 
     /// @inheritdoc IWrappedTokenAdapter
-    function removeWrapper(IERC20 from, IERC20 to) external onlyOwner {
+    function removeWrapper(IERC20 from, IERC20 to)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
         _removeWrapper(from, to);
     }
 

@@ -30,9 +30,6 @@ contract SwapAdapterMock is Test, ISwapAdapter {
         deal(address(to), beneficiary, to.balanceOf(beneficiary) + toAmount);
     }
 
-    /// @inheritdoc ISwapAdapter
-    function setSwapper(address swapper) external { }
-
     function setSlippagePCT(uint256 slippage) external {
         slippagePCT = slippage;
     }

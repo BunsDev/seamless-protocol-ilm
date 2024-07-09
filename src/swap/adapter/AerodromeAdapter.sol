@@ -23,14 +23,15 @@ contract AerodromeAdapter is SwapAdapterBase, IAerodromeAdapter {
     address public poolFactory;
 
     constructor(
-        address _owner,
+        address _initialAdmin,
         address _router,
         address _factory,
         address _swapper
-    ) Ownable(_owner) {
+    ) {
         router = _router;
         poolFactory = _factory;
-        _setSwapper(_swapper);
+        _grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
+        _grantRole(SWAPPER_ROLE, _swapper);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -39,14 +40,14 @@ contract AerodromeAdapter is SwapAdapterBase, IAerodromeAdapter {
         IERC20 to,
         uint256 fromAmount,
         address payable beneficiary
-    ) external onlySwapper returns (uint256 toAmount) {
+    ) external onlyRole(SWAPPER_ROLE) returns (uint256 toAmount) {
         return _executeSwap(from, to, fromAmount, beneficiary);
     }
 
     /// @inheritdoc IAerodromeAdapter
     function setIsPoolStable(IERC20 from, IERC20 to, bool status)
         external
-        onlyOwner
+        onlyRole(MANAGER_ROLE)
     {
         isPoolStable[from][to] = status;
 
@@ -54,14 +55,14 @@ contract AerodromeAdapter is SwapAdapterBase, IAerodromeAdapter {
     }
 
     /// @inheritdoc IAerodromeAdapter
-    function setPoolFactory(address factory) external onlyOwner {
+    function setPoolFactory(address factory) external onlyRole(MANAGER_ROLE) {
         poolFactory = factory;
 
         emit PoolFactorySet(factory);
     }
 
     /// @inheritdoc IAerodromeAdapter
-    function setRouter(address _router) external onlyOwner {
+    function setRouter(address _router) external onlyRole(MANAGER_ROLE) {
         router = _router;
 
         emit RouterSet(_router);
@@ -70,7 +71,7 @@ contract AerodromeAdapter is SwapAdapterBase, IAerodromeAdapter {
     /// @inheritdoc IAerodromeAdapter
     function setRoutes(IERC20 from, IERC20 to, IRouter.Route[] memory routes)
         external
-        onlyOwner
+        onlyRole(MANAGER_ROLE)
     {
         if (swapRoutes[from][to].length != 0) {
             _removeRoutes(from, to);
@@ -84,13 +85,11 @@ contract AerodromeAdapter is SwapAdapterBase, IAerodromeAdapter {
     }
 
     /// @inheritdoc IAerodromeAdapter
-    function removeRoutes(IERC20 from, IERC20 to) external onlyOwner {
+    function removeRoutes(IERC20 from, IERC20 to)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
         _removeRoutes(from, to);
-    }
-
-    /// @inheritdoc ISwapAdapter
-    function setSwapper(address swapper) external onlyOwner {
-        _setSwapper(swapper);
     }
 
     /// @inheritdoc IAerodromeAdapter

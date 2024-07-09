@@ -11,6 +11,7 @@ import { DefaultReserveInterestRateStrategy } from
     "@aave/contracts/protocol/pool/DefaultReserveInterestRateStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { DeployHelper } from "../../script/deploy/DeployHelper.s.sol";
+import { DeployHelperLib } from "../../script/deploy/DeployHelperLib.sol";
 import { LoopStrategyConfig } from
     "../../script/deploy/config/LoopStrategyConfig.sol";
 import { DeployForkConfigs } from
@@ -79,8 +80,25 @@ contract IntegrationBase is Test, DeployHelper, DeployForkConfigs {
         swapper = _deploySwapper(
             testDeployer.addr, config.swapperConfig.swapperOffsetDeviation
         );
-        (wrappedTokenAdapter, aerodromeAdapter) = _deploySwapAdapters(
-            Swapper(address(swapper)), wrappedToken, testDeployer.addr
+        (wrappedTokenAdapter, aerodromeAdapter) =
+            _deploySwapAdapters(Swapper(address(swapper)), testDeployer.addr);
+
+        IERC20 wrappedUnderlyingToken = wrappedToken.underlying();
+
+        wrappedTokenAdapter.grantRole(
+            wrappedTokenAdapter.MANAGER_ROLE(), testDeployer.addr
+        );
+        wrappedTokenAdapter.setWrapper(
+            wrappedUnderlyingToken,
+            IERC20(address(wrappedToken)),
+            IWrappedERC20PermissionedDeposit(wrappedToken)
+        );
+
+        aerodromeAdapter.grantRole(
+            aerodromeAdapter.MANAGER_ROLE(), testDeployer.addr
+        );
+        DeployHelperLib._setAerodromeAdapterRoutes(
+            aerodromeAdapter, wrappedUnderlyingToken, WETH, AERODROME_FACTORY
         );
         _setupSwapperRoutes(
             Swapper(address(swapper)),

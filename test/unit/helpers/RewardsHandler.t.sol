@@ -2,6 +2,7 @@
 pragma solidity ^0.8.21;
 
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IPool } from "@aave/contracts/interfaces/IPool.sol";
 import { IRewardsController } from
     "@aave-periphery/contracts/rewards/interfaces/IRewardsController.sol";
@@ -71,12 +72,13 @@ contract RewardsHandler is Test, TestConstants {
 
         (, address user,) = vm.readCallers();
 
-        deal(address(supplyToken), user, amount);
         deal(address(strategyUnderlying), user, amount);
 
         strategyUnderlying.approve(address(strategy), amount);
 
         uint256 shares = strategy.deposit(amount, user);
+
+        deal(address(supplyToken), user, shares);
         supplyToken.approve(address(pool), shares);
         pool.deposit(address(supplyToken), shares, user, 0);
 
@@ -97,10 +99,20 @@ contract RewardsHandler is Test, TestConstants {
 
         amount = bound(amount, MIN_REDEEM_AMOUNT, strategy.balanceOf(user));
 
-        strategy.redeem(amount, user, user);
-        pool.withdraw(address(supplyToken), amount, user);
-
-        skip(timeToPass);
+        try strategy.redeem(amount, user, user) {
+            pool.withdraw(address(supplyToken), amount, user);
+            skip(timeToPass);
+        } catch Error(string memory reason) {
+            // if user redeems close to all shares from the strategy, it can revert with error '35'
+            // issue itemId=70345890
+            if (Strings.equal(reason, "35")) {
+                assertApproxEqRel(
+                    amount, strategy.totalSupply(), 0.00000001 * 1e18
+                );
+            } else {
+                revert(reason);
+            }
+        }
     }
 
     function transfer(

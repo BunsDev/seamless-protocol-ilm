@@ -45,6 +45,10 @@ import {
     AerodromeAdapter,
     IAerodromeAdapter
 } from "../../src/swap/adapter/AerodromeAdapter.sol";
+import {
+    UniversalAerodromeAdapter,
+    IUniversalAerodromeAdapter
+} from "../../src/swap/adapter/UniversalAerodromeAdapter.sol";
 import { ISwapAdapter } from "../../src/interfaces/ISwapAdapter.sol";
 import { DeployHelperLib } from "./DeployHelperLib.sol";
 import "forge-std/console.sol";
@@ -204,6 +208,59 @@ contract DeployHelper is BaseMainnetConstants {
 
         _logAddress("WrappedTokenAdapter", address(wrappedTokenAdapter));
         _logAddress("AerodromeAdapter", address(aerodromeAdapter));
+    }
+
+    /// @notice deploys a wrapped token adapter and an aerodrome adapter
+    /// @param swapper Swapper contract
+    /// @param initialAdmin address of initial admin
+    /// @return wrappedTokenAdapter newly deployed wrapped token adapter
+    /// @return aerodromeAdapter newly deploy aerodrome adapter
+    function _deploySwapAdapters(Swapper swapper, address initialAdmin)
+        internal
+        returns (
+            WrappedTokenAdapter wrappedTokenAdapter,
+            AerodromeAdapter aerodromeAdapter
+        )
+    {
+        // WrappedToken Adapter
+        wrappedTokenAdapter =
+            new WrappedTokenAdapter(initialAdmin, address(swapper));
+        // UnderlyingToken <-> WETH Aerodrome Adapter
+        aerodromeAdapter = new AerodromeAdapter(
+            initialAdmin, AERODROME_ROUTER, AERODROME_FACTORY, address(swapper)
+        );
+
+        _logAddress("WrappedTokenAdapter", address(wrappedTokenAdapter));
+        _logAddress("AerodromeAdapter", address(aerodromeAdapter));
+    }
+
+    /// @notice deploys a wrapped token adapter
+    /// @param swapper Swapper contract
+    /// @param initialAdmin address of initial admin
+    /// @return wrappedTokenAdapter newly deployed wrapped token adapter
+    function _deployWrappedTokenAdapter(Swapper swapper, address initialAdmin)
+        internal
+        returns (WrappedTokenAdapter wrappedTokenAdapter)
+    {
+        // WrappedToken Adapter
+        wrappedTokenAdapter =
+            new WrappedTokenAdapter(initialAdmin, address(swapper));
+
+        _logAddress("WrappedTokenAdapter", address(wrappedTokenAdapter));
+    }
+
+    /// @notice deploys a UniversalAerodromeAdapter instance
+    /// @param initialAdmin address to be first default admin
+    /// @return adapter deployed UniversalAerodromeAdapter
+    function _deployUniversalAerodromeAdapter(address initialAdmin)
+        internal
+        returns (UniversalAerodromeAdapter adapter)
+    {
+        adapter = new UniversalAerodromeAdapter(
+            initialAdmin, UNIVERSAL_ROUTER, SWAPPER
+        );
+
+        _logAddress("UniversalAerodromeAdapter: ", address(adapter));
     }
 
     /// @dev set up the routes for swapping (wrappedToken <-> WETH)

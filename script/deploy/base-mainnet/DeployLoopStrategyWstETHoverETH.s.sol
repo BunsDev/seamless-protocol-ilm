@@ -13,8 +13,11 @@ import { WrappedTokenAdapter } from
 import { AerodromeAdapter } from
     "../../../src/swap/adapter/AerodromeAdapter.sol";
 import { DeployHelper } from "../DeployHelper.s.sol";
-import { WrappedERC20PermissionedDeposit } from
-    "../../../src/tokens/WrappedERC20PermissionedDeposit.sol";
+import { DeployHelperLib } from "../DeployHelperLib.sol";
+import {
+    WrappedERC20PermissionedDeposit,
+    IWrappedERC20PermissionedDeposit
+} from "../../../src/tokens/WrappedERC20PermissionedDeposit.sol";
 import {
     LoopStrategyConfig,
     ERC20Config,
@@ -83,7 +86,25 @@ contract DeployLoopStrategyWstETHoverETH is
         (
             WrappedTokenAdapter wrappedTokenAdapter,
             AerodromeAdapter aerodromeAdapter
-        ) = _deploySwapAdapters(swapper, wrappedToken, deployerAddress);
+        ) = _deploySwapAdapters(swapper, deployerAddress);
+
+        IERC20 underlyingToken = wrappedToken.underlying();
+
+        wrappedTokenAdapter.grantRole(
+            wrappedTokenAdapter.MANAGER_ROLE(), deployerAddress
+        );
+        wrappedTokenAdapter.setWrapper(
+            underlyingToken,
+            IERC20(address(wrappedToken)),
+            IWrappedERC20PermissionedDeposit(wrappedToken)
+        );
+
+        aerodromeAdapter.grantRole(
+            aerodromeAdapter.MANAGER_ROLE(), deployerAddress
+        );
+        DeployHelperLib._setAerodromeAdapterRoutes(
+            aerodromeAdapter, underlyingToken, WETH, AERODROME_FACTORY
+        );
 
         _setupSwapperRoutes(
             Swapper(address(swapper)),
@@ -112,9 +133,13 @@ contract DeployLoopStrategyWstETHoverETH is
         _grantRoles(strategy, strategy.UPGRADER_ROLE());
         _grantRoles(strategy, strategy.PAUSER_ROLE());
 
-        // transfer ownership on token adapters
-        wrappedTokenAdapter.transferOwnership(SEAMLESS_COMMUNITY_MULTISIG);
-        aerodromeAdapter.transferOwnership(SEAMLESS_COMMUNITY_MULTISIG);
+        _grantRoles(
+            wrappedTokenAdapter, wrappedTokenAdapter.DEFAULT_ADMIN_ROLE()
+        );
+        _grantRoles(wrappedTokenAdapter, wrappedTokenAdapter.MANAGER_ROLE());
+
+        _grantRoles(aerodromeAdapter, aerodromeAdapter.DEFAULT_ADMIN_ROLE());
+        _grantRoles(aerodromeAdapter, aerodromeAdapter.MANAGER_ROLE());
 
         // renounce deployer roles
         swapper.renounceRole(swapper.MANAGER_ROLE(), deployerAddress);
@@ -125,6 +150,20 @@ contract DeployLoopStrategyWstETHoverETH is
         strategy.renounceRole(strategy.PAUSER_ROLE(), deployerAddress);
         strategy.renounceRole(strategy.UPGRADER_ROLE(), deployerAddress);
         strategy.renounceRole(strategy.DEFAULT_ADMIN_ROLE(), deployerAddress);
+
+        // renounce roles on adapters
+        wrappedTokenAdapter.renounceRole(
+            wrappedTokenAdapter.MANAGER_ROLE(), deployerAddress
+        );
+        wrappedTokenAdapter.renounceRole(
+            wrappedTokenAdapter.DEFAULT_ADMIN_ROLE(), deployerAddress
+        );
+        aerodromeAdapter.renounceRole(
+            aerodromeAdapter.DEFAULT_ADMIN_ROLE(), deployerAddress
+        );
+        aerodromeAdapter.renounceRole(
+            aerodromeAdapter.MANAGER_ROLE(), deployerAddress
+        );
 
         vm.stopBroadcast();
     }
