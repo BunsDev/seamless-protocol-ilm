@@ -24,8 +24,8 @@ library LoopStrategyStorage {
         CollateralRatio collateralRatioTargets;
         /// @dev error margin on specific target collateral ratio passed in function calls
         uint256 ratioMargin;
-        /// @dev acceptable error margin on usd values - a value from 0 - ONE_USD
-        uint256 usdMargin;
+        /// @dev deprecated
+        uint256 __deprecated_usdMargin;
         /// @dev pool address provider for the Seamles Protocol lending pools
         IPoolAddressesProvider poolAddressProvider;
         /// @dev struct encapsulating address of the lending pool and configuration (interest rate mode)
@@ -38,6 +38,8 @@ library LoopStrategyStorage {
         uint16 maxIterations;
         /// @dev maximum amount total assets (total equity) of the strategy
         uint256 assetsCap;
+        /// @dev maximum allowed slippage percent on rebalancing
+        uint256 maxSlippageOnRebalance;
     }
 
     // keccak256(abi.encode(uint256(keccak256("seamless.contracts.storage.LoopStrategy")) - 1)) & ~bytes32(uint256(0xff));

@@ -78,8 +78,8 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         uint256 initialAliceShares = strategy.balanceOf(alice);
 
         // grab pre-redeem key parameters of strategy/user state
-        uint256 initialCollateralUSD = strategy.collateral();
-        uint256 initialDebtUSD = strategy.debt();
+        uint256 initialCollateralUSD = strategy.collateralUSD();
+        uint256 initialDebtUSD = strategy.debtUSD();
         uint256 initialEquityUSD = strategy.equityUSD();
         uint256 initialAliceAssets = CbETH.balanceOf(alice);
 
@@ -148,13 +148,13 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         // strategy collateral decrease should be equivalent to share collateral after
         // accounting for the debt which does not have to be repaid
         assertApproxEqRel(
-            initialCollateralUSD - strategy.collateral(),
+            initialCollateralUSD - strategy.collateralUSD(),
             adjustedShareCollateralUSD,
             MARGIN
         );
         // strategy debt difference should be equivalent to debt repaid
         assertApproxEqRel(
-            initialDebtUSD - strategy.debt(), adjustedShareDebtUSD, MARGIN
+            initialDebtUSD - strategy.debtUSD(), adjustedShareDebtUSD, MARGIN
         );
 
         // strategy equity should decrease at most as much as share equity
@@ -193,8 +193,8 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         uint256 initialAliceShares = strategy.balanceOf(alice);
 
         // grab pre-redeem key parameters of strategy/user state
-        uint256 initialCollateralUSD = strategy.collateral();
-        uint256 initialDebtUSD = strategy.debt();
+        uint256 initialCollateralUSD = strategy.collateralUSD();
+        uint256 initialDebtUSD = strategy.debtUSD();
         uint256 initialAliceAssets = CbETH.balanceOf(alice);
 
         // calculate amount of debt, collateral and equity corresponding to shares to be redeemed
@@ -217,9 +217,9 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         assertEq(strategy.totalSupply(), 0);
 
         // ensure there is no remainin collateral
-        assertEq(strategy.collateral(), 0);
+        assertEq(strategy.collateralUSD(), 0);
         // ensure the full debt of strategy is repaid
-        assertEq(strategy.debt(), 0);
+        assertEq(strategy.debtUSD(), 0);
         // ensure that the remaining equity in USD is calculated correctly to 0
         assertEq(strategy.equityUSD(), 0);
 
@@ -249,7 +249,7 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         );
 
         // ensure all debt is repaid
-        assertEq(strategy.debt(), 0);
+        assertEq(strategy.debtUSD(), 0);
     }
 
     /// @dev tests that the redeemer incurs no equity cost when the redemption does not throw the collateral ratio
@@ -273,7 +273,7 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         uint256 oldAliceShareBalance = strategy.balanceOf(alice);
 
         // // grab pre-redeem key parameters of strategy/user state
-        uint256 oldCollateralUSD = strategy.collateral();
+        uint256 oldCollateralUSD = strategy.collateralUSD();
         uint256 oldEquityUSD = strategy.equityUSD();
         uint256 oldCollateralAssetBalance = CbETH.balanceOf(alice);
 
@@ -283,7 +283,7 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
             .shareDebtAndEquity(
             LoanState({
                 collateralUSD: oldCollateralUSD,
-                debtUSD: strategy.debt(),
+                debtUSD: strategy.debtUSD(),
                 maxWithdrawAmount: 0
             }),
             redeemAmount,
@@ -320,7 +320,7 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
 
         // strategy collateral and equity must decrease exactly by share equity,
         // as no rebalancing was needed after redeeming
-        assertEq(oldCollateralUSD - strategy.collateral(), shareEquityUSD);
+        assertEq(oldCollateralUSD - strategy.collateralUSD(), shareEquityUSD);
         assertEq(oldEquityUSD - strategy.equityUSD(), shareEquityUSD);
 
         // ensure that an amount of underlying tokens equal in value to shareEquityUSD
@@ -364,14 +364,17 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         // calculate amount of collateral needed to bring the collateral ratio
         // to target, on the strategy wide rebalance
         uint256 neededCollateralUSD = RebalanceMath.requiredCollateralUSD(
-            targets.target, strategy.collateral(), strategy.debt(), swapOffset
+            targets.target,
+            strategy.collateralUSD(),
+            strategy.debtUSD(),
+            swapOffset
         );
 
         // calculate new debt and collateral values after collateral has been exchanged
         // for rebalance
         uint256 expectedCollateralUSD =
-            strategy.collateral() - neededCollateralUSD;
-        uint256 expectedDebtUSD = strategy.debt() - neededCollateralUSD
+            strategy.collateralUSD() - neededCollateralUSD;
+        uint256 expectedDebtUSD = strategy.debtUSD() - neededCollateralUSD
             + neededCollateralUSD.usdMul(swapOffset); // TODO: this value is off by 20 wei, recheck with rounding pr
         uint256 expectedCR = RebalanceMath.collateralRatioUSD(
             expectedCollateralUSD, expectedDebtUSD
@@ -426,7 +429,8 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         // collateral withdrawn from redeem must be equal to initialShareEquityUSD
         // as no rebalance cost burdened redeemer
         assertEq(
-            expectedCollateralUSD - strategy.collateral(), initialShareEquityUSD
+            expectedCollateralUSD - strategy.collateralUSD(),
+            initialShareEquityUSD
         );
         assertApproxEqRel(
             expectedCollateralUSD - expectedDebtUSD - strategy.equityUSD(),
@@ -481,8 +485,8 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         uint256 initialAliceShares = strategy.balanceOf(alice);
 
         // grab pre-redeem key parameters of strategy/user state
-        uint256 initialCollateralUSD = strategy.collateral();
-        uint256 initialDebtUSD = strategy.debt();
+        uint256 initialCollateralUSD = strategy.collateralUSD();
+        uint256 initialDebtUSD = strategy.debtUSD();
         uint256 initialEquityUSD = strategy.equityUSD();
         uint256 initialAliceAssets = CbETH.balanceOf(alice);
 
@@ -521,7 +525,7 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         assertLe(initialEquityUSD - initialShareEquityUSD, strategy.equityUSD());
 
         // assert that at least the initialShareDebtUSD value has been repaid
-        assertLt(initialShareDebtUSD, initialDebtUSD - strategy.debt());
+        assertLt(initialShareDebtUSD, initialDebtUSD - strategy.debtUSD());
     }
 
     /// @dev ensures that the predicted assets returned by the preview redeem call
@@ -621,8 +625,8 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         uint256 initialTotalSupply = strategy.totalSupply();
 
         // grab pre-redeem key parameters of strategy/user state
-        uint256 initialCollateralUSD = strategy.collateral();
-        uint256 initialDebtUSD = strategy.debt();
+        uint256 initialCollateralUSD = strategy.collateralUSD();
+        uint256 initialDebtUSD = strategy.debtUSD();
 
         (uint256 initialShareDebtUSD, uint256 initialShareEquityUSD) = LoanLogic
             .shareDebtAndEquity(
@@ -715,20 +719,84 @@ contract LoopStrategyRedeemTest is LoopStrategyTest {
         strategy.redeem(redeemAmount, bob, alice);
     }
 
-    /// @dev ensures that if slippage is too high, then redeem call will revert
-    function test_redeem_revertsWhen_slippageIsTooHigh() public {
-        assertEq(strategy.totalSupply(), 0);
+    /// @dev tests that user receives the correct amount of assets on redeem when debtUSD = 0
+    /// @dev this can happen if user repays debt on behalf of the strategy, and borrow cap is reached
+    function test_redeem_repayTotalDebtAttackWhileBorrowCapReached() public {
+        // set dex fees to 0 for easier calculations
+        SwapperMock(address(swapper)).setRealOffsets(0, 0);
+        SwapperMock(address(swapper)).setOffsets(0, 0);
+
+        // alice and bob both deposit the same amount to the strategy
         uint256 depositAmount = 1 ether;
         uint256 aliceShares = _depositFor(alice, depositAmount);
+        uint256 bobShares = _depositFor(bob, depositAmount);
 
-        uint256 redeemAmount = aliceShares / 2;
+        (,, address debtUSDbCaddress) =
+            poolDataProvider.getReserveTokensAddresses(address(USDbC));
+        IERC20 dUSDbC = IERC20(debtUSDbCaddress);
 
-        _setupSwapperWithMockAdapter();
-        wethCbETHAdapter.setSlippagePCT(25);
+        uint256 totalDebt = dUSDbC.balanceOf(address(strategy));
+        deal(address(USDbC), bob, totalDebt);
 
-        vm.expectRevert(ISwapper.MaxSlippageExceeded.selector);
+        IPool pool = strategy.getLendingPool().pool;
 
+        // assume that borrow cap is reached so we can't rebalance anymore before redeem
+        _changeBorrowCap(USDbC, 1);
+
+        // bob repays the whole debt on behalf of the strategy, then redeems all his shares
+        vm.startPrank(bob);
+        USDbC.approve(address(pool), totalDebt);
+        pool.repay(address(USDbC), totalDebt, 2, address(strategy));
+        assertEq(strategy.debtUSD(), 0);
+        uint256 equityBeforeRedeem = strategy.equity();
+        uint256 totalAssetsReceived = strategy.redeem(bobShares, bob, bob);
+        vm.stopPrank();
+
+        // should get half of the equity because alice and bob have equal amount of shares
+        assertEq(totalAssetsReceived, equityBeforeRedeem / 2);
+    }
+
+    /// @dev tests that user receives the correct amount of assets when he has
+    /// almost all strategy shares and debtUSD = 0
+    function test_redeem_userHasAlmostAllStrategyShares() public {
+        uint256 targetCollateralUSD = 100000095;
+        uint256 targetDebtUSD = 95;
+
+        uint256 aliceShares = 9999;
+
+        // bob has 1 share, and alice has all the rest
+        deal(address(strategy), alice, aliceShares, true);
+        deal(address(strategy), bob, 1, true);
+
+        uint256 collateralAssets = (targetCollateralUSD * 1e18)
+            / priceOracle.getAssetPrice(address(CbETH));
+
+        IPool pool = strategy.getLendingPool().pool;
+
+        deal(address(CbETH), address(strategy), collateralAssets);
+
+        // setup the strategy with target collateral and debt
+        vm.startPrank(address(strategy));
+        CbETH.approve(address(pool), collateralAssets);
+        pool.supply(address(CbETH), collateralAssets, address(strategy), 0);
+        pool.borrow(address(USDbC), targetDebtUSD, 2, 0, address(strategy));
+        vm.stopPrank();
+
+        uint256 equityBeforeRedeem = strategy.equity();
+
+        // assume that borrow cap is reached so we can't rebalance anymore before redeem
+        _changeBorrowCap(USDbC, 1);
+
+        // set dex fees to 0 for easier calculations
+        SwapperMock(address(swapper)).setRealOffsets(0, 0);
+        SwapperMock(address(swapper)).setOffsets(0, 0);
+
+        // alice redeems all her shares
         vm.prank(alice);
-        strategy.redeem(redeemAmount, alice, alice);
+        uint256 receivedAssets = strategy.redeem(aliceShares, alice, alice);
+
+        // alice shouldn't get the whole equity
+        assertLt(receivedAssets, equityBeforeRedeem);
+        assertGt(strategy.collateralUSD(), 0);
     }
 }

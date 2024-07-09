@@ -45,6 +45,9 @@ interface ILoopStrategy is IERC4626 {
     /// 0 < margin < 1e8 (1 USD)
     error MarginOutsideRange();
 
+    /// @notice thrown when attempting to set max slippage value which is bigger than 100%
+    error MaxSlippageOutOfRange();
+
     /// @notice thrown when the caller of the redeem function is not the owner of the
     /// shares to be redeemed
     error RedeemerNotOwner();
@@ -73,6 +76,10 @@ interface ILoopStrategy is IERC4626 {
     /// @param swapper new address of swapper contract
     event SwapperSet(address swapper);
 
+    /// @notice emitted when a new value for maxSlippageOnRebalanceSet is set
+    /// @param maxSlippage new value for maximum allowed slippage percentage (1e8 is 100%)
+    event MaxSlippageOnRebalanceSet(uint256 maxSlippage);
+
     /// @notice returns the amount of equity belonging to the strategy
     /// in underlying token value
     /// @return amount equity amount
@@ -86,12 +93,12 @@ interface ILoopStrategy is IERC4626 {
     /// @notice returns the amount of debt belonging to the strategy
     /// in underlying value (USD)
     /// @return amount debt amount
-    function debt() external view returns (uint256 amount);
+    function debtUSD() external view returns (uint256 amount);
 
     /// @notice returns the amount of collateral belonging to the strategy
     /// in underlying value (USD)
     /// @return amount collateral amount
-    function collateral() external view returns (uint256 amount);
+    function collateralUSD() external view returns (uint256 amount);
 
     /// @notice pauses deposits and withdrawals from the contract
     function pause() external;
@@ -124,8 +131,7 @@ interface ILoopStrategy is IERC4626 {
     /// @notice rebalances the strategy
     /// @dev perofrms a downwards/upwards leverage depending on the current strategy state in order to be
     /// within collateral ratio range
-    /// @return ratio value of collateral ratio after strategy rebalances
-    function rebalance() external returns (uint256 ratio);
+    function rebalance() external;
 
     /// @notice retruns true if collateral ratio is out of the target range, and we need to rebalance pool
     /// @return shouldRebalance true if rebalance is needed
@@ -160,10 +166,6 @@ interface ILoopStrategy is IERC4626 {
     /// @param assetsCap new value of assets cap
     function setAssetsCap(uint256 assetsCap) external;
 
-    /// @notice sets the usdMarginUSD value
-    /// @param marginUSD new value of usdMarginUSD
-    function setUSDMargin(uint256 marginUSD) external;
-
     /// @notice sets the ratioMarginUSD value
     /// @param marginUSD new value of ratioMarginUSD
     function setRatioMargin(uint256 marginUSD) external;
@@ -171,6 +173,10 @@ interface ILoopStrategy is IERC4626 {
     /// @notice sets the maxIterations value
     /// @param iterations new value of maxIterations
     function setMaxIterations(uint16 iterations) external;
+
+    /// @notice sets the maxSlippageOnRebalance value
+    /// @param maxSlippage new value of maxSlippageOnRebalance
+    function setMaxSlippageOnRebalance(uint256 maxSlippage) external;
 
     /// @notice sets the swapper contract address
     /// @param swapper address of swapper contract
@@ -199,15 +205,22 @@ interface ILoopStrategy is IERC4626 {
     /// @return swapper address of swapper contract
     function getSwapper() external view returns (address swapper);
 
-    /// @notice returns value of usdMargin
-    /// @return marginUSD usdMargin value
-    function getUSDMargin() external view returns (uint256 marginUSD);
-
     /// @notice returns value of ratioMargin
     /// @return marginUSD ratioMargin value
-    function getRatioMagin() external view returns (uint256 marginUSD);
+    function getRatioMargin() external view returns (uint256 marginUSD);
 
     /// @notice returns value of maxIterations
     /// @return iterations maxIterations value
     function getMaxIterations() external view returns (uint256 iterations);
+
+    /// @notice returns value of assetsCap
+    /// @return assetsCap assetsCap value
+    function getAssetsCap() external view returns (uint256 assetsCap);
+
+    /// @notice returns value of maxSlippageOnRebalance
+    /// @param maxSlippage MaxSlippageOnRebalance value
+    function getMaxSlippageOnRebalance()
+        external
+        view
+        returns (uint256 maxSlippage);
 }

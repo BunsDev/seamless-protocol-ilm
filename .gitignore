@@ -36,3 +36,7 @@ pnpm-lock.yaml
 
 # simulation output
 test/integration/output
+
+# certora
+.certora_internal/
+certora/munged/*

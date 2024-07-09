@@ -18,12 +18,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-          
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-      
+
       - name: Run Forge Format
         run: |
           forge fmt --check
@@ -35,9 +35,23 @@ jobs:
           forge build --sizes
         id: build
 
-      - name: Run Forge Tests
-        env: 
+      - name: Run Unit Tests
+        env:
           BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
         run: |
-          forge test -vvv --gas-report
+          make test
         id: test
+
+      - name: Run End-to-End Simulation Test
+        env:
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+        run: |
+          make run-simulation
+        id: simulation
+
+      - name: Run ILM Rewards Invariant Test
+        env:
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+        run: |
+          make test-invariant-rewards
+        id: invariant-rewards-test

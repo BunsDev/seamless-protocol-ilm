@@ -29,6 +29,7 @@ import {
 import { ConversionMath } from "./libraries/math/ConversionMath.sol";
 import { RebalanceMath } from "./libraries/math/RebalanceMath.sol";
 import { USDWadRayMath } from "./libraries/math/USDWadRayMath.sol";
+import { Constants } from "./libraries/math/Constants.sol";
 import { SafeERC20 } from
     "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ISwapper } from "./interfaces/ISwapper.sol";
@@ -38,11 +39,15 @@ import { AccessControlUpgradeable } from
     "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { UUPSUpgradeable } from
     "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IRewardsController } from
+    "@aave-periphery/contracts/rewards/interfaces/IRewardsController.sol";
+import { IScaledToken } from "./interfaces/IScaledToken.sol";
 
 /// @title LoopStrategy
 /// @notice Integrated Liquidity Market strategy for amplifying the cbETH staking rewards
 contract LoopStrategy is
     ILoopStrategy,
+    IScaledToken,
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
@@ -56,6 +61,10 @@ contract LoopStrategy is
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     /// @dev role which can upgrade the contract
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    /// @dev constant for getting the incentives controller address
+    bytes32 public constant INCENTIVES_CONTROLLER =
+        keccak256("INCENTIVES_CONTROLLER");
 
     constructor() {
         _disableInitializers();
@@ -80,6 +89,9 @@ contract LoopStrategy is
         __ERC20_init(_erc20name, _erc20symbol);
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
+
+        _validateCollateralRatioTargets(_collateralRatioTargets);
+        _validateRatioMargin(_ratioMargin);
 
         Storage.Layout storage $ = Storage.layout();
         $.assets = _strategyAssets;
@@ -135,24 +147,35 @@ contract LoopStrategy is
         Storage.layout().lendingPool.interestRateMode = _interestRateMode;
     }
 
+    /// @dev validates collateral ratio targets values
+    /// @param targets collateral ratio targets to validate
+    function _validateCollateralRatioTargets(CollateralRatio memory targets)
+        internal
+        pure
+    {
+        if (
+            targets.minForWithdrawRebalance > targets.target
+                || targets.maxForDepositRebalance < targets.target
+                || targets.minForRebalance > targets.minForWithdrawRebalance
+                || targets.maxForRebalance < targets.maxForDepositRebalance
+        ) {
+            revert InvalidCollateralRatioTargets();
+        }
+    }
+
     /// @inheritdoc ILoopStrategy
     function setCollateralRatioTargets(CollateralRatio memory targets)
         external
         override
         onlyRole(MANAGER_ROLE)
     {
-        if (
-            targets.minForRebalance > targets.target
-                || targets.maxForRebalance < targets.target
-                || targets.minForRebalance > targets.minForWithdrawRebalance
-                || targets.maxForRebalance < targets.maxForDepositRebalance
-        ) {
-            revert InvalidCollateralRatioTargets();
-        }
+        _validateCollateralRatioTargets(targets);
 
         Storage.layout().collateralRatioTargets = targets;
 
         emit CollateralRatioTargetsSet(targets);
+
+        _tryRebalance();
     }
 
     /// @inheritdoc ILoopStrategy
@@ -178,12 +201,12 @@ contract LoopStrategy is
     }
 
     /// @inheritdoc ILoopStrategy
-    function debt() external view override returns (uint256 amount) {
+    function debtUSD() external view override returns (uint256 amount) {
         return LoanLogic.getLoanState(Storage.layout().lendingPool).debtUSD;
     }
 
     /// @inheritdoc ILoopStrategy
-    function collateral() external view override returns (uint256 amount) {
+    function collateralUSD() external view override returns (uint256 amount) {
         return
             LoanLogic.getLoanState(Storage.layout().lendingPool).collateralUSD;
     }
@@ -202,21 +225,12 @@ contract LoopStrategy is
     }
 
     /// @inheritdoc ILoopStrategy
-    function rebalance()
-        external
-        override
-        whenNotPaused
-        returns (uint256 ratio)
-    {
+    function rebalance() public override whenNotPaused {
         if (!rebalanceNeeded()) {
             revert RebalanceNotNeeded();
         }
-        Storage.Layout storage $ = Storage.layout();
-        return RebalanceLogic.rebalanceTo(
-            $,
-            LoanLogic.getLoanState($.lendingPool),
-            $.collateralRatioTargets.target
-        );
+
+        _tryRebalance();
     }
 
     /// @inheritdoc ILoopStrategy
@@ -395,15 +409,12 @@ contract LoopStrategy is
         emit AssetsCapSet(assetsCap);
     }
 
-    /// @inheritdoc ILoopStrategy
-    function setUSDMargin(uint256 marginUSD) external onlyRole(MANAGER_ROLE) {
+    /// @dev validates the marginUSD vlue
+    /// @param marginUSD value to validate
+    function _validateRatioMargin(uint256 marginUSD) internal pure {
         if (marginUSD > USDWadRayMath.USD) {
             revert MarginOutsideRange();
         }
-
-        Storage.layout().usdMargin = marginUSD;
-
-        emit USDMarginSet(marginUSD);
     }
 
     /// @inheritdoc ILoopStrategy
@@ -411,9 +422,7 @@ contract LoopStrategy is
         external
         onlyRole(MANAGER_ROLE)
     {
-        if (marginUSD > USDWadRayMath.USD) {
-            revert MarginOutsideRange();
-        }
+        _validateRatioMargin(marginUSD);
 
         Storage.layout().ratioMargin = marginUSD;
 
@@ -428,6 +437,20 @@ contract LoopStrategy is
         Storage.layout().maxIterations = iterations;
 
         emit MaxIterationsSet(iterations);
+    }
+
+    /// @inheritdoc ILoopStrategy
+    function setMaxSlippageOnRebalance(uint256 maxSlippage)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        if (maxSlippage > Constants.MAX_SLIPPAGE) {
+            revert MaxSlippageOutOfRange();
+        }
+
+        Storage.layout().maxSlippageOnRebalance = maxSlippage;
+
+        emit MaxSlippageOnRebalanceSet(maxSlippage);
     }
 
     /// @inheritdoc ILoopStrategy
@@ -467,18 +490,55 @@ contract LoopStrategy is
     }
 
     /// @inheritdoc ILoopStrategy
-    function getUSDMargin() external view returns (uint256 marginUSD) {
-        return Storage.layout().usdMargin;
-    }
-
-    /// @inheritdoc ILoopStrategy
-    function getRatioMagin() external view returns (uint256 marginUSD) {
+    function getRatioMargin() external view returns (uint256 marginUSD) {
         return Storage.layout().ratioMargin;
     }
 
     /// @inheritdoc ILoopStrategy
     function getMaxIterations() external view returns (uint256 iterations) {
         return Storage.layout().maxIterations;
+    }
+
+    /// @inheritdoc ILoopStrategy
+    function getAssetsCap() external view returns (uint256 assetsCap) {
+        return Storage.layout().assetsCap;
+    }
+
+    /// @inheritdoc ILoopStrategy
+    function getMaxSlippageOnRebalance()
+        external
+        view
+        returns (uint256 maxslippage)
+    {
+        return Storage.layout().maxSlippageOnRebalance;
+    }
+
+    /// @inheritdoc IScaledToken
+    function scaledTotalSupply() external view returns (uint256) {
+        return totalSupply();
+    }
+
+    /// @inheritdoc IScaledToken
+    function getScaledUserBalanceAndSupply(address user)
+        external
+        view
+        returns (uint256, uint256)
+    {
+        return (balanceOf(user), totalSupply());
+    }
+
+    /// @notice rebalance the position if it's out of collateral target range
+    function _tryRebalance() internal {
+        if (rebalanceNeeded()) {
+            Storage.Layout storage $ = Storage.layout();
+
+            RebalanceLogic.rebalanceTo(
+                $,
+                LoanLogic.getLoanState($.lendingPool),
+                $.collateralRatioTargets.target,
+                $.maxSlippageOnRebalance
+            );
+        }
     }
 
     /// @notice deposit assets to the strategy with the requirement of equity received after rebalance
@@ -502,13 +562,18 @@ contract LoopStrategy is
             $.assets.underlying, msg.sender, address(this), assets
         );
 
+        _tryRebalance();
+
         assets = _convertUnderlyingToCollateralAsset($.assets, assets);
 
-        LoanState memory state = RebalanceLogic.updateState($);
+        LoanState memory state = LoanLogic.getLoanState($.lendingPool);
 
         uint256 prevTotalAssets = totalAssets();
 
-        RebalanceLogic.rebalanceAfterSupply($, state, assets);
+        // MAX_SLIPPAGE is allowed because we check minSharesReceived
+        RebalanceLogic.rebalanceAfterSupply(
+            $, state, assets, Constants.MAX_SLIPPAGE
+        );
 
         uint256 equityReceived = totalAssets() - prevTotalAssets;
         shares = _convertToShares(equityReceived, prevTotalAssets);
@@ -538,9 +603,14 @@ contract LoopStrategy is
     ) internal returns (uint256 assets) {
         Storage.Layout storage $ = Storage.layout();
 
+        _tryRebalance();
+
+        // MAX_SLIPPAGE is allowed because we check minUnderlyingAsset received
         uint256 shareUnderlyingAsset = _convertCollateralToUnderlyingAsset(
             $.assets,
-            RebalanceLogic.rebalanceBeforeWithdraw($, shares, totalSupply())
+            RebalanceLogic.rebalanceBeforeWithdraw(
+                $, shares, totalSupply(), Constants.MAX_SLIPPAGE
+            )
         );
 
         // ensure equity in asset terms to be received is larger than
@@ -632,5 +702,37 @@ contract LoopStrategy is
             underlyingDecimals,
             Math.Rounding.Floor
         );
+    }
+
+    function _update(address from, address to, uint256 value)
+        internal
+        override
+    {
+        if (from != address(0)) {
+            _handleAction(from, totalSupply(), balanceOf(from));
+        }
+
+        if (to != address(0) && to != from) {
+            _handleAction(to, totalSupply(), balanceOf(to));
+        }
+
+        super._update(from, to, value);
+    }
+
+    function _handleAction(
+        address user,
+        uint256 totalSupply,
+        uint256 oldUserBalance
+    ) internal {
+        IPoolAddressesProvider poolAddressProvider =
+            Storage.layout().poolAddressProvider;
+
+        IRewardsController rewardsController = IRewardsController(
+            poolAddressProvider.getAddress(INCENTIVES_CONTROLLER)
+        );
+
+        if (address(rewardsController) != address(0)) {
+            rewardsController.handleAction(user, totalSupply, oldUserBalance);
+        }
     }
 }
