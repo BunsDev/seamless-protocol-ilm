@@ -106,7 +106,9 @@ contract RewardsHandler is Test, TestConstants {
             // if user redeems close to all shares from the strategy, it can revert with error '35'
             // issue itemId=70345890
             if (Strings.equal(reason, "35")) {
-                assertApproxEqRel(amount, strategy.totalSupply(), 0.00000001 * 1e18);
+                assertApproxEqRel(
+                    amount, strategy.totalSupply(), 0.00000001 * 1e18
+                );
             } else {
                 revert(reason);
             }
