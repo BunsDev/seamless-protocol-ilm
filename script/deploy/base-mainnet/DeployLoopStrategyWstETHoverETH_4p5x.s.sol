@@ -26,35 +26,35 @@ import { CollateralRatio } from "../../../src/types/DataTypes.sol";
 import { USDWadRayMath } from "../../../src/libraries/math/USDWadRayMath.sol";
 import { BaseMainnetConstants } from "../config/BaseMainnetConstants.sol";
 
-contract LoopStrategyWstETHoverETHConfig_10x is BaseMainnetConstants {
+contract LoopStrategyWstETHoverETHConfig_4p5x is BaseMainnetConstants {
     WrappedERC20PermissionedDeposit public wrappedToken =
         WrappedERC20PermissionedDeposit(BASE_MAINNET_SEAMLESS_WRAPPED_WSTETH);
 
-    // TODO: set asset cap
-    uint256 public assetsCap = 0 ether;
+    uint256 public assetsCap = 35 ether;
 
     uint256 public maxSlippageOnRebalance = 1_000000; // 1%
 
-    LoopStrategyConfig public wstETHoverETHconfig_10x = LoopStrategyConfig({
+    LoopStrategyConfig public wstETHoverETHconfig_4p5x = LoopStrategyConfig({
         // wstETH address
         underlyingTokenAddress: BASE_MAINNET_wstETH,
         // wstETH-USD Adapter oracle (used in the Seamless pool)
         underlyingTokenOracle: WSTETH_ETH_ORACLE,
         strategyERC20Config: ERC20Config({
-            name: "Seamless ILM 10x Loop wstETH/ETH",
-            symbol: "ilm-wstETH/ETH-10xloop"
+            name: "Seamless ILM 4p5x Loop wstETH/ETH",
+            symbol: "ilm-wstETH/ETH-4p5xloop"
         }),
         wrappedTokenERC20Config: ERC20Config("", ""), // empty, not used
         wrappedTokenReserveConfig: ReserveConfig(
             address(0), "", "", "", "", "", "", 0, 0, 0
         ), // empty, not used
+
         collateralRatioConfig: CollateralRatioConfig({
             collateralRatioTargets: CollateralRatio({
-                target: USDWadRayMath.usdDiv(110, 100), // 1.1
-                minForRebalance: USDWadRayMath.usdDiv(109, 100), // 1.09
-                maxForRebalance: USDWadRayMath.usdDiv(1100015, 1000000), // 1.100015
-                maxForDepositRebalance: USDWadRayMath.usdDiv(110, 100), // 1.1
-                minForWithdrawRebalance: USDWadRayMath.usdDiv(110, 100) // 1.1
+                target: USDWadRayMath.usdDiv(1285, 1000), // 1.285 (4.5x)
+                minForRebalance: USDWadRayMath.usdDiv(12593, 10000), // 1.2593 (-2%) (4.85x)
+                maxForRebalance: USDWadRayMath.usdDiv(1285015, 1000000), // 1.285015 (4.508x)
+                maxForDepositRebalance: USDWadRayMath.usdDiv(1285, 1000), // = target
+                minForWithdrawRebalance: USDWadRayMath.usdDiv(1285, 1000) // = target
              }),
             ratioMargin: 1, // 0.000001% ratio margin
             maxIterations: 20
@@ -67,10 +67,10 @@ contract LoopStrategyWstETHoverETHConfig_10x is BaseMainnetConstants {
     });
 }
 
-contract DeployLoopStrategyWstETHoverETH_10x is
+contract DeployLoopStrategyWstETHoverETH_4p5x is
     Script,
     DeployHelper,
-    LoopStrategyWstETHoverETHConfig_10x
+    LoopStrategyWstETHoverETHConfig_4p5x
 {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
@@ -82,7 +82,7 @@ contract DeployLoopStrategyWstETHoverETH_10x is
             wrappedToken,
             deployerAddress,
             ISwapper(SWAPPER),
-            wstETHoverETHconfig_10x
+            wstETHoverETHconfig_4p5x
         );
 
         strategy.setAssetsCap(assetsCap);

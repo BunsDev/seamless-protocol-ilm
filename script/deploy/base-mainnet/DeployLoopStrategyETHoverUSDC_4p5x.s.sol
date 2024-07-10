@@ -7,14 +7,17 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IAccessControl } from
     "@openzeppelin/contracts/access/IAccessControl.sol";
 import { ISwapper, Swapper } from "../../../src/swap/Swapper.sol";
+import { IRouter } from "../../../src/vendor/aerodrome/IRouter.sol";
 import { LoopStrategy, ILoopStrategy } from "../../../src/LoopStrategy.sol";
-import { WrappedTokenAdapter } from
-    "../../../src/swap/adapter/WrappedTokenAdapter.sol";
-import { AerodromeAdapter } from
-    "../../../src/swap/adapter/AerodromeAdapter.sol";
+import { IWrappedTokenAdapter } from
+    "../../../src/interfaces/IWrappedTokenAdapter.sol";
+import { IAerodromeAdapter } from
+    "../../../src/interfaces/IAerodromeAdapter.sol";
 import { DeployHelper } from "../DeployHelper.s.sol";
-import { WrappedERC20PermissionedDeposit } from
-    "../../../src/tokens/WrappedERC20PermissionedDeposit.sol";
+import {
+    WrappedERC20PermissionedDeposit,
+    IWrappedERC20PermissionedDeposit
+} from "../../../src/tokens/WrappedERC20PermissionedDeposit.sol";
 import {
     LoopStrategyConfig,
     ERC20Config,
@@ -22,27 +25,33 @@ import {
     CollateralRatioConfig,
     SwapperConfig
 } from "../config/LoopStrategyConfig.sol";
-import { CollateralRatio } from "../../../src/types/DataTypes.sol";
+import {
+    CollateralRatio, StrategyAssets
+} from "../../../src/types/DataTypes.sol";
 import { USDWadRayMath } from "../../../src/libraries/math/USDWadRayMath.sol";
 import { BaseMainnetConstants } from "../config/BaseMainnetConstants.sol";
+import { ISwapAdapter } from "../../../src/interfaces/ISwapAdapter.sol";
+import { DeployHelperLib } from "../DeployHelperLib.sol";
+import { DeployLoopStrategyETHoverUSDCGuardianPayload } from
+    "./DeployLoopStrategyETHoverUSDCGuardianPayload.sol";
 
-contract LoopStrategyWstETHoverETHConfig_5x is BaseMainnetConstants {
+contract LoopStrategyETHoverUSDCConfig_4p5x is BaseMainnetConstants {
+    // wrapped WETH
     WrappedERC20PermissionedDeposit public wrappedToken =
-        WrappedERC20PermissionedDeposit(BASE_MAINNET_SEAMLESS_WRAPPED_WSTETH);
+        WrappedERC20PermissionedDeposit(BASE_MAINNET_SEAMLESS_WRAPPED_WETH);
 
-    // TODO: set asset cap
-    uint256 public assetsCap = 0 ether;
+    uint256 public assetsCap = 35 ether;
 
     uint256 public maxSlippageOnRebalance = 1_000000; // 1%
 
-    LoopStrategyConfig public wstETHoverETHconfig_5x = LoopStrategyConfig({
-        // wstETH address
-        underlyingTokenAddress: BASE_MAINNET_wstETH,
-        // wstETH-USD Adapter oracle (used in the Seamless pool)
-        underlyingTokenOracle: WSTETH_ETH_ORACLE,
+    LoopStrategyConfig public ethOverUSDCconfig_4p5x = LoopStrategyConfig({
+        // WETH address
+        underlyingTokenAddress: BASE_MAINNET_WETH,
+        // ETH-USD oracle
+        underlyingTokenOracle: WETH_USD_ORACLE,
         strategyERC20Config: ERC20Config({
-            name: "Seamless ILM 5x Loop wstETH/ETH",
-            symbol: "ilm-wstETH/ETH-5xloop"
+            name: "Seamless ILM 4p5x Loop ETH/USDC",
+            symbol: "ilm-ETH/USDC-4p5xloop"
         }),
         wrappedTokenERC20Config: ERC20Config("", ""), // empty, not used
         wrappedTokenReserveConfig: ReserveConfig(
@@ -50,12 +59,11 @@ contract LoopStrategyWstETHoverETHConfig_5x is BaseMainnetConstants {
         ), // empty, not used
         collateralRatioConfig: CollateralRatioConfig({
             collateralRatioTargets: CollateralRatio({
-                target: USDWadRayMath.usdDiv(120, 100), // 1.2
-                // TODO: depends on the LTV
-                minForRebalance: USDWadRayMath.usdDiv(119, 100), // 1.19
-                maxForRebalance: USDWadRayMath.usdDiv(1200015, 1000000), // 1.200015
-                maxForDepositRebalance: USDWadRayMath.usdDiv(120, 100), // 1.2
-                minForWithdrawRebalance: USDWadRayMath.usdDiv(120, 100) // 1.2
+                target: USDWadRayMath.usdDiv(1285, 1000), // 1.285 (4.5x)
+                minForRebalance: USDWadRayMath.usdDiv(12593, 10000), // 1.2593 (-2%) (4.85x)
+                maxForRebalance: USDWadRayMath.usdDiv(13107, 10000), // 1.3107 (+2%) (4.21x)
+                maxForDepositRebalance: USDWadRayMath.usdDiv(1285, 1000), // = target
+                minForWithdrawRebalance: USDWadRayMath.usdDiv(1285, 1000) // = target
              }),
             ratioMargin: 1, // 0.000001% ratio margin
             maxIterations: 20
@@ -64,14 +72,14 @@ contract LoopStrategyWstETHoverETHConfig_5x is BaseMainnetConstants {
             swapperOffsetFactor: 0, // not used
             swapperOffsetDeviation: 0 // not used
          }),
-        debtAsset: BASE_MAINNET_WETH
+        debtAsset: BASE_MAINNET_USDC
     });
 }
 
-contract DeployLoopStrategyWstETHoverETH_5x is
+contract DeployLoopStrategyETHoverUSDC_4p5x is
     Script,
     DeployHelper,
-    LoopStrategyWstETHoverETHConfig_5x
+    LoopStrategyETHoverUSDCConfig_4p5x
 {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PK");
@@ -79,11 +87,10 @@ contract DeployLoopStrategyWstETHoverETH_5x is
 
         vm.startBroadcast(deployerPrivateKey);
 
+        Swapper swapper = Swapper(SWAPPER);
+
         LoopStrategy strategy = _deployLoopStrategy(
-            wrappedToken,
-            deployerAddress,
-            ISwapper(SWAPPER),
-            wstETHoverETHconfig_5x
+            wrappedToken, deployerAddress, swapper, ethOverUSDCconfig_4p5x
         );
 
         strategy.setAssetsCap(assetsCap);

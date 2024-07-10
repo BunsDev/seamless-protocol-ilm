@@ -40,8 +40,7 @@ contract LoopStrategyETHoverUSDCConfig_3x is BaseMainnetConstants {
     WrappedERC20PermissionedDeposit public wrappedToken =
         WrappedERC20PermissionedDeposit(BASE_MAINNET_SEAMLESS_WRAPPED_WETH);
 
-    // TODO: set assets cap
-    uint256 public assetsCap = 0 ether;
+    uint256 public assetsCap = 35 ether;
 
     uint256 public maxSlippageOnRebalance = 1_000000; // 1%
 
