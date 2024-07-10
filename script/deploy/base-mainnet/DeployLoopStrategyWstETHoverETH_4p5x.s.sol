@@ -38,7 +38,7 @@ contract LoopStrategyWstETHoverETHConfig_4p5x is BaseMainnetConstants {
         // wstETH address
         underlyingTokenAddress: BASE_MAINNET_wstETH,
         // wstETH-USD Adapter oracle (used in the Seamless pool)
-        underlyingTokenOracle: WSTETH_ETH_ORACLE,
+        underlyingTokenOracle: WSTETH_USD_ORACLE,
         strategyERC20Config: ERC20Config({
             name: "Seamless ILM 4p5x Loop wstETH/ETH",
             symbol: "ilm-wstETH/ETH-4p5xloop"

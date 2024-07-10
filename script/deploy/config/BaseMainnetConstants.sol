@@ -53,7 +53,7 @@ abstract contract BaseMainnetConstants {
     address public constant AERODROME_ADAPTER =
         0x6Cfc78c96f87e522EBfDF86995609414cFB1DcB2;
 
-    address public constant WSTETH_ETH_ORACLE =
+    address public constant WSTETH_USD_ORACLE =
         0xD815218fA8c9bd605c2b048f26cd374A752cAA76;
     address public constant WETH_USD_ORACLE =
         0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
