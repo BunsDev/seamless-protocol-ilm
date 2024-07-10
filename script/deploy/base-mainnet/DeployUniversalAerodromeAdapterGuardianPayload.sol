@@ -23,9 +23,6 @@ contract DeployUniversalAerodromeAdapterGuardianPayload is
 {
     error NotAuthorized();
 
-    int24 TICK_SPACING_WETH_USDC = 100;
-    int24 TICK_SPACING_WETH_WSTETH = 1;
-
     function run(
         UniversalAerodromeAdapter universalAerodromeAdapter,
         address wrappedTokenAdapter
@@ -36,19 +33,6 @@ contract DeployUniversalAerodromeAdapterGuardianPayload is
         ) {
             revert NotAuthorized();
         }
-
-        _constructAndSetPaths(
-            universalAerodromeAdapter,
-            BASE_MAINNET_USDC,
-            BASE_MAINNET_WETH,
-            TICK_SPACING_WETH_USDC
-        );
-        _constructAndSetPaths(
-            universalAerodromeAdapter,
-            BASE_MAINNET_SEAMLESS_WRAPPED_WETH,
-            BASE_MAINNET_SEAMLESS_WRAPPED_WSTETH,
-            TICK_SPACING_WETH_WSTETH
-        );
 
         DeployHelperLib._setSwapperRouteBetweenWrappedAndToken(
             ISwapper(SWAPPER),
@@ -72,26 +56,5 @@ contract DeployUniversalAerodromeAdapterGuardianPayload is
 
         bytes32 MANAGER_ROLE = keccak256("MANAGER_ROLE");
         IAccessControl(SWAPPER).renounceRole(MANAGER_ROLE, address(this));
-        universalAerodromeAdapter.renounceRole(MANAGER_ROLE, address(this));
-    }
-
-    function _constructAndSetPaths(
-        UniversalAerodromeAdapter adapter,
-        address tokenA,
-        address tokenB,
-        int24 tickSpacing
-    ) internal {
-        address[] memory aToB = new address[](2);
-        address[] memory bToA = new address[](2);
-        int24[] memory tickSpacings = new int24[](1);
-
-        aToB[0] = tokenA;
-        aToB[1] = tokenB;
-        bToA[0] = tokenB;
-        bToA[1] = tokenA;
-        tickSpacings[0] = tickSpacing;
-
-        adapter.setPath(aToB, tickSpacings);
-        adapter.setPath(bToA, tickSpacings);
     }
 }
