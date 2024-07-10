@@ -13,7 +13,6 @@ import { DeployUniversalAerodromeAdapterGuardianPayload } from
     "./DeployUniversalAerodromeAdapterGuardianPayload.sol";
 
 contract DeployUniversalAerodromeAdapter is Script, DeployHelper {
-
     int24 TICK_SPACING_WETH_USDC = 100;
     int24 TICK_SPACING_WETH_WSTETH = 1;
 

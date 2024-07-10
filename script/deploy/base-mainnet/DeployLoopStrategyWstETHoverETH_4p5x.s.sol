@@ -47,7 +47,6 @@ contract LoopStrategyWstETHoverETHConfig_4p5x is BaseMainnetConstants {
         wrappedTokenReserveConfig: ReserveConfig(
             address(0), "", "", "", "", "", "", 0, 0, 0
         ), // empty, not used
-
         collateralRatioConfig: CollateralRatioConfig({
             collateralRatioTargets: CollateralRatio({
                 target: USDWadRayMath.usdDiv(1285, 1000), // 1.285 (4.5x)
